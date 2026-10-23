@@ -1,10 +1,9 @@
 :root {
   color-scheme: light;
-  --bg: rgba(255, 250, 252, 0.92);
-  --panel: rgba(255, 255, 255, 0.86);
   --ink: #3a2a35;
   --muted: #8a7380;
   --accent: #e891b0;
+  --panel: rgba(255, 255, 255, 0.92);
   --border: rgba(58, 42, 53, 0.12);
   font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
 }
@@ -13,75 +12,79 @@
 
 html, body, #root {
   margin: 0;
+  width: 100%;
   height: 100%;
-  background: transparent;
+  background: transparent !important;
   overflow: hidden;
   color: var(--ink);
-}
-
-.app {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-  border-radius: 16px;
-  border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
-  overflow: hidden;
-}
-
-.titlebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 10px 8px 14px;
-  border-bottom: 1px solid var(--border);
-  -webkit-app-region: drag;
   user-select: none;
 }
 
-.titlebar strong { font-size: 14px; }
-.titlebar .sub { margin-left: 8px; color: var(--muted); font-size: 12px; }
-.titlebar-btns { -webkit-app-region: no-drag; display: flex; gap: 4px; }
-.titlebar-btns button {
-  width: 28px; height: 24px; border: none; border-radius: 6px;
-  background: transparent; color: var(--ink); cursor: pointer; font-size: 16px;
+.desktop-pet {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  overflow: hidden;
 }
-.titlebar-btns button:hover { background: rgba(0,0,0,0.06); }
 
-.main {
-  flex: 1;
+.pet-layer {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 16px 16px;
-  gap: 10px;
-  overflow: auto;
+  justify-content: flex-end;
+  padding: 8px 8px 4px;
+  background: transparent;
 }
 
 .bubble {
-  max-width: 90%;
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  max-width: 88%;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 8px 12px;
-  font-size: 13px;
-  box-shadow: 0 4px 16px rgba(58,42,53,0.08);
+  border-radius: 14px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(58, 42, 53, 0.12);
   cursor: pointer;
+  animation: bubbleIn 0.2s ease;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+@keyframes bubbleIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .pet-stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 230px;
-  cursor: pointer;
+  width: 220px;
+  height: 220px;
+  cursor: grab;
+  background: transparent;
+  -webkit-app-region: no-drag;
 }
-.pet-art-wrap { position: relative; display: inline-block; }
+.pet-stage:active { cursor: grabbing; }
+
+.pet-art-wrap { position: relative; display: inline-block; pointer-events: none; }
 .pet-art {
-  width: 220px; height: 220px; object-fit: contain;
+  width: 200px; height: 200px; object-fit: contain;
   image-rendering: auto;
   transition: transform 0.25s ease, filter 0.3s ease, opacity 0.3s ease;
+  filter: drop-shadow(0 8px 12px rgba(58, 42, 53, 0.18));
 }
 .pet-tint {
   position: absolute; inset: 0; pointer-events: none; border-radius: 12px;
@@ -92,8 +95,8 @@ html, body, #root {
   background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 6px;
 }
 .pet-bounce .pet-art, .pet-bounce svg { animation: bounce 0.45s ease; }
-.pet-dim .pet-art, .pet-dim svg { filter: brightness(0.85); opacity: 0.85; }
-.pet-sleep .pet-art { transform: translateY(8px); filter: brightness(0.8); }
+.pet-dim .pet-art, .pet-dim svg { filter: brightness(0.85) drop-shadow(0 8px 12px rgba(58, 42, 53, 0.18)); opacity: 0.85; }
+.pet-sleep .pet-art { transform: translateY(8px); filter: brightness(0.8) drop-shadow(0 8px 12px rgba(58, 42, 53, 0.18)); }
 
 @keyframes bounce {
   0% { transform: scale(1); }
@@ -101,9 +104,82 @@ html, body, #root {
   100% { transform: scale(1); }
 }
 
+.status-hud {
+  width: 200px;
+  margin-top: 2px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 14px rgba(58, 42, 53, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  animation: bubbleIn 0.15s ease;
+  pointer-events: none;
+}
+.status-hud.pinned {
+  background: rgba(255, 255, 255, 0.92);
+}
+.hud-row {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  gap: 6px;
+  align-items: center;
+}
+.hud-label {
+  font-size: 10px;
+  color: var(--muted);
+}
+.hud-track {
+  height: 5px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.hud-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.35s ease;
+}
+
+.panel-layer {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin: 0 8px 8px;
+  padding: 10px 12px 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(58, 42, 53, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-header strong { font-size: 14px; }
+.panel-header .sub { color: var(--muted); font-size: 12px; flex: 1; }
+.panel-close {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink);
+}
+.panel-close:hover { border-color: var(--accent); color: #c45a82; }
+
 .controls {
   width: 100%;
-  background: var(--panel);
+  background: rgba(255,255,255,0.7);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 10px 12px;
@@ -160,7 +236,7 @@ html, body, #root {
 }
 .pet-art-wrap .spine-player,
 .pet-art-wrap > div[data-spine-animation] {
-  width: 220px; height: 220px;
+  width: 200px; height: 200px;
 }
 .pet-art-wrap .spine-player-canvas { width: 100% !important; height: 100% !important; }
 

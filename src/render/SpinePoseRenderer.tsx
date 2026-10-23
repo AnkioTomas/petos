@@ -49,6 +49,7 @@ export function SpinePoseRenderer({
         hostRef.current.innerHTML = ''
         const SpinePlayer = mod.SpinePlayer
         player = new SpinePlayer(hostRef.current, {
+          preserveDrawingBuffer: false,
           skeleton: skeletonUrl,
           atlas: atlasUrl,
           animation,
@@ -71,7 +72,7 @@ export function SpinePoseRenderer({
             setError(msg || 'Spine 加载失败')
             onFallback?.()
           },
-        } as ConstructorParameters<typeof SpinePlayer>[1])
+        } as unknown as ConstructorParameters<typeof SpinePlayer>[1])
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         setError(msg)

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, net, Menu, Tray, nativeImage, screen } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -28,25 +28,110 @@ const store = new Store<PersistShape>({
 })
 
 let mainWindow: BrowserWindow | null = null
+let tray: Tray | null = null
+let sleeping = false
+let panelOpen = false
 
 const isDev = !app.isPackaged
+
+const PET_SIZE = { width: 260, height: 300 }
+const PANEL_SIZE = { width: 360, height: 560 }
 
 function brandIconPath() {
   const p = path.join(app.getAppPath(), 'assets', 'brand', 'logo.png')
   return fs.existsSync(p) ? p : undefined
 }
 
+function trayIcon() {
+  const iconPath = brandIconPath()
+  if (!iconPath) return nativeImage.createEmpty()
+  const img = nativeImage.createFromPath(iconPath)
+  return img.resize({ width: 18, height: 18 })
+}
+
+function sendMenuAction(action: string) {
+  mainWindow?.webContents.send('menu:action', action)
+}
+
+function buildPetMenu(): Menu {
+  return Menu.buildFromTemplate([
+    {
+      label: sleeping ? '叫醒' : '睡一会儿',
+      click: () => sendMenuAction(sleeping ? 'wake' : 'sleep'),
+    },
+    {
+      label: '喂食',
+      enabled: !sleeping,
+      click: () => sendMenuAction('feed'),
+    },
+    {
+      label: '摸摸',
+      enabled: !sleeping,
+      click: () => sendMenuAction('pet'),
+    },
+    { type: 'separator' },
+    {
+      label: '导入素材',
+      submenu: [
+        { label: '选择 ZIP…', click: () => sendMenuAction('import-zip') },
+        { label: '选择文件夹…', click: () => sendMenuAction('import-folder') },
+        { label: '空白模板', click: () => sendMenuAction('import-blank') },
+      ],
+    },
+    {
+      label: panelOpen ? '收起面板' : '打开面板',
+      click: () => sendMenuAction('toggle-panel'),
+    },
+    {
+      label: '显示状态',
+      click: () => sendMenuAction('show-status'),
+    },
+    { type: 'separator' },
+    {
+      label: '退出 PetOS',
+      click: () => app.quit(),
+    },
+  ])
+}
+
+function showContextMenu() {
+  if (!mainWindow) return
+  buildPetMenu().popup({ window: mainWindow })
+}
+
+function applyWindowMode(openPanel: boolean) {
+  panelOpen = openPanel
+  if (!mainWindow) return
+  const size = openPanel ? PANEL_SIZE : PET_SIZE
+  mainWindow.setResizable(openPanel)
+  mainWindow.setMinimumSize(openPanel ? 320 : PET_SIZE.width, openPanel ? 420 : PET_SIZE.height)
+  const [x, y] = mainWindow.getPosition()
+  mainWindow.setSize(size.width, size.height)
+  // keep top-left anchored so pet doesn't jump
+  mainWindow.setPosition(x, y)
+}
+
 function createWindow() {
+  const display = screen.getPrimaryDisplay().workArea
+  const x = Math.round(display.x + display.width - PET_SIZE.width - 40)
+  const y = Math.round(display.y + display.height - PET_SIZE.height - 40)
+
   mainWindow = new BrowserWindow({
-    width: 420,
-    height: 560,
-    minWidth: 320,
-    minHeight: 420,
+    width: PET_SIZE.width,
+    height: PET_SIZE.height,
+    x,
+    y,
+    minWidth: PET_SIZE.width,
+    minHeight: PET_SIZE.height,
     title: 'PetOS · 我的宠物',
     transparent: true,
     frame: false,
-    hasShadow: true,
-    resizable: true,
+    hasShadow: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
     backgroundColor: '#00000000',
     icon: brandIconPath(),
     webPreferences: {
@@ -56,6 +141,11 @@ function createWindow() {
       sandbox: false,
     },
   })
+
+  mainWindow.setAlwaysOnTop(true, 'floating')
+  if (process.platform === 'darwin') {
+    mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  }
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:5173')
@@ -68,11 +158,25 @@ function createWindow() {
   })
 }
 
+function createTray() {
+  tray = new Tray(trayIcon())
+  tray.setToolTip('PetOS · 我的宠物')
+  tray.setContextMenu(buildPetMenu())
+  tray.on('click', () => {
+    if (!mainWindow) return
+    if (mainWindow.isVisible()) mainWindow.focus()
+    else mainWindow.show()
+  })
+  tray.on('right-click', () => {
+    tray?.setContextMenu(buildPetMenu())
+    tray?.popUpContextMenu()
+  })
+}
+
 async function extractZipToUserData(zipPath: string): Promise<string> {
   const buf = fs.readFileSync(zipPath)
   const zip = await JSZip.loadAsync(buf)
   const names = Object.keys(zip.files)
-  // Find manifest.json; allow one root folder wrapper
   let manifestEntry = names.find((n) => n === 'manifest.json' || n.endsWith('/manifest.json'))
   if (!manifestEntry) {
     throw new Error('素材包缺少 manifest.json')
@@ -121,7 +225,6 @@ function copyDirSafe(src: string, dest: string) {
       fs.mkdirSync(to, { recursive: true })
       copyDirSafe(from, to)
     } else if (ent.isFile()) {
-      // Only allow common resource extensions + json
       const ext = path.extname(ent.name).toLowerCase()
       const allowed = ['.json', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.atlas', '.skel', '.mp3', '.ogg', '.wav', '.txt', '.md']
       if (!allowed.includes(ext)) continue
@@ -213,8 +316,33 @@ function registerIpc() {
     mainWindow?.close()
   })
 
+  ipcMain.handle('window:showContextMenu', () => {
+    showContextMenu()
+    return true
+  })
+
+  ipcMain.on('window:move-offset', (e, mouseX: number, mouseY: number) => {
+    const win = BrowserWindow.fromWebContents(e.sender)
+    if (!win) return
+    const point = screen.getCursorScreenPoint()
+    win.setPosition(Math.round(point.x - mouseX), Math.round(point.y - mouseY))
+  })
+
+  ipcMain.handle('window:setPanelOpen', (_e, open: boolean) => {
+    applyWindowMode(!!open)
+    tray?.setContextMenu(buildPetMenu())
+    return panelOpen
+  })
+
+  ipcMain.handle('window:getPanelOpen', () => panelOpen)
+
+  ipcMain.handle('pet:setSleeping', (_e, value: boolean) => {
+    sleeping = !!value
+    tray?.setContextMenu(buildPetMenu())
+    return sleeping
+  })
+
   ipcMain.handle('pack:getBlankTemplatePath', () => {
-    // In dev: project/templates/blank-pack; in prod: resources
     if (isDev) {
       return path.join(app.getAppPath(), 'templates', 'blank-pack')
     }
@@ -354,11 +482,11 @@ function registerIpc() {
 }
 
 app.whenReady().then(() => {
-  // Allow loading local pack assets via file: URLs from renderer
   protocol.handle('file', (request) => net.fetch(request.url))
 
   registerIpc()
   createWindow()
+  createTray()
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -367,4 +495,9 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  tray?.destroy()
+  tray = null
 })

@@ -16,6 +16,20 @@ const api = {
   setNeeds: (needs: NeedsState) => ipcRenderer.invoke('persist:setNeeds', needs) as Promise<boolean>,
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
+  showContextMenu: () => ipcRenderer.invoke('window:showContextMenu') as Promise<boolean>,
+  moveWindowOffset: (mouseX: number, mouseY: number) => {
+    ipcRenderer.send('window:move-offset', mouseX, mouseY)
+  },
+  setPanelOpen: (open: boolean) => ipcRenderer.invoke('window:setPanelOpen', open) as Promise<boolean>,
+  getPanelOpen: () => ipcRenderer.invoke('window:getPanelOpen') as Promise<boolean>,
+  setSleeping: (value: boolean) => ipcRenderer.invoke('pet:setSleeping', value) as Promise<boolean>,
+  onMenuAction: (handler: (action: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, action: string) => handler(action)
+    ipcRenderer.on('menu:action', listener)
+    return () => {
+      ipcRenderer.removeListener('menu:action', listener)
+    }
+  },
   loadActivePack: () =>
     ipcRenderer.invoke('pack:loadActive') as Promise<{
       pack: { dir: string; manifest: unknown; name: string | null } | null
