@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 type Props = {
-  /** file:// URL to skeleton .json */
+  /** petos:// URL to skeleton .json */
   skeletonUrl: string
   atlasUrl: string
   textureUrl?: string | null

@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, dialog, protocol, net, Menu, Tray, nativeImage, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, protocol, Menu, Tray, nativeImage, screen } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
-import { pathToFileURL } from 'node:url'
+import { pathToFileURL, fileURLToPath } from 'node:url'
 import Store from 'electron-store'
 import JSZip from 'jszip'
 
@@ -33,6 +33,21 @@ let sleeping = false
 let panelOpen = false
 
 const isDev = !app.isPackaged
+
+// Must run before app.ready — allows <img src="petos://..."> from Vite http origin
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'petos',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+      bypassCSP: true,
+    },
+  },
+])
 
 const PET_SIZE = { width: 260, height: 300 }
 const PANEL_SIZE = { width: 360, height: 560 }
@@ -474,16 +489,67 @@ function registerIpc() {
     if (!packDir || !relSrc || relSrc.includes('..') || path.isAbsolute(relSrc)) {
       return null
     }
+    const root = path.normalize(packDir + path.sep)
     const full = path.normalize(path.join(packDir, relSrc))
-    if (!full.startsWith(path.normalize(packDir))) return null
+    if (!full.startsWith(root) && full !== path.normalize(packDir)) return null
     if (!fs.existsSync(full)) return null
-    return pathToFileURL(full).href
+    // petos://pack/<abs-path> — privileged scheme; works from Vite http origin
+    return `petos://pack${pathToFileURL(full).pathname}`
+  })
+}
+
+function mimeFor(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase()
+  switch (ext) {
+    case '.png':
+      return 'image/png'
+    case '.jpg':
+    case '.jpeg':
+      return 'image/jpeg'
+    case '.webp':
+      return 'image/webp'
+    case '.gif':
+      return 'image/gif'
+    case '.svg':
+      return 'image/svg+xml'
+    case '.json':
+      return 'application/json'
+    case '.atlas':
+      return 'text/plain'
+    default:
+      return 'application/octet-stream'
+  }
+}
+
+function registerPetosProtocol() {
+  protocol.handle('petos', (request) => {
+    try {
+      const u = new URL(request.url)
+      if (u.hostname !== 'pack') {
+        return new Response('Bad Host', { status: 400 })
+      }
+      // pathname is absolute POSIX form from pathToFileURL (e.g. /Users/...)
+      const filePath = fileURLToPath(new URL(u.pathname, 'file://'))
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        return new Response('Not Found', { status: 404 })
+      }
+      const data = fs.readFileSync(filePath)
+      return new Response(data, {
+        status: 200,
+        headers: {
+          'Content-Type': mimeFor(filePath),
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'no-cache',
+        },
+      })
+    } catch {
+      return new Response('Bad Request', { status: 400 })
+    }
   })
 }
 
 app.whenReady().then(() => {
-  protocol.handle('file', (request) => net.fetch(request.url))
-
+  registerPetosProtocol()
   registerIpc()
   createWindow()
   createTray()

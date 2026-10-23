@@ -20,7 +20,7 @@ type Props = {
  * 统一姿态渲染：frames → 序列播放；image/webp → <img>（浏览器播动画 WebP）；
  * spine → SpinePoseRenderer；失败层层回退到静图 + CSS 缓动。
  */
-export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, className }: Props) {
+export function PoseRenderer({ pack, poseKey, def, visual, usedFallback: _usedFallback, alt, className }: Props) {
   const [mode, setMode] = useState<'native' | 'image-fallback'>('native')
   const type = getPoseType(def)
 
@@ -54,7 +54,6 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
             className={className}
             onFallback={() => setMode('image-fallback')}
           />
-          {usedFallback && <span className="pet-fallback-tag">缺姿态 · 回退</span>}
         </div>
       )
     }
@@ -73,7 +72,6 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
           onError={() => setMode('image-fallback')}
         />
         {visual.tint && <div className="pet-tint" style={{ background: visual.tint }} aria-hidden />}
-        {usedFallback && <span className="pet-fallback-tag">缺姿态 · 回退</span>}
       </div>
     )
   }
@@ -83,7 +81,6 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
     return (
       <div className="pet-art-wrap">
         <FrameSequencePlayer frames={idleFrames} fps={10} loop className={className} alt={alt} />
-        <span className="pet-fallback-tag">资源回退 · 帧序列</span>
       </div>
     )
   }
@@ -94,7 +91,6 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
       <div className="pet-art-wrap">
         <img src={singleUrl} alt={alt} className={className} draggable={false} />
         {visual.tint && <div className="pet-tint" style={{ background: visual.tint }} aria-hidden />}
-        {usedFallback && <span className="pet-fallback-tag">缺姿态 · 回退</span>}
       </div>
     )
   }
@@ -105,7 +101,6 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
     return (
       <div className="pet-art-wrap">
         <img src={idleSrc} alt={alt} className={className} draggable={false} />
-        <span className="pet-fallback-tag">资源回退</span>
       </div>
     )
   }

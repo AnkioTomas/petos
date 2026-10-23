@@ -89,11 +89,6 @@ html, body, #root {
 .pet-tint {
   position: absolute; inset: 0; pointer-events: none; border-radius: 12px;
 }
-.pet-fallback-tag {
-  position: absolute; left: 8px; bottom: 8px;
-  font-size: 10px; color: var(--muted);
-  background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 6px;
-}
 .pet-bounce .pet-art, .pet-bounce svg { animation: bounce 0.45s ease; }
 .pet-dim .pet-art, .pet-dim svg { filter: brightness(0.85) drop-shadow(0 8px 12px rgba(58, 42, 53, 0.18)); opacity: 0.85; }
 .pet-sleep .pet-art { transform: translateY(8px); filter: brightness(0.8) drop-shadow(0 8px 12px rgba(58, 42, 53, 0.18)); }
