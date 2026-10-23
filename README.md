@@ -32,7 +32,7 @@ Electron / 安装包图标请优先用 `assets/brand/logo.png` 或 512 图；改
 |---|---|
 | 壳 | Electron |
 | UI | Vite + TypeScript + React |
-| 立绘 | PNG/WebP **帧序列**、动画 WebP、静图；**Spine** 为 QQ 宠级质量路径；缺动画用 CSS 缓动 |
+| 立绘 | PNG/WebP **帧序列**、动画 WebP、静图；**Spine** 为高质量骨骼动效路径；缺动画用 CSS 缓动 |
 | 素材包 | 文件夹或 ZIP + 声明式 `manifest.json`（schema 1） |
 | 持久化 | electron-store（userData） |
 

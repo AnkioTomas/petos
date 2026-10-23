@@ -29,7 +29,7 @@
 
 或省略 type：`{ "src": "idle.png" }`
 
-### 3) Spine（QQ 宠级动态，质量路径）
+### 3) Spine（高质量骨骼动效路径）
 
 ```json
 "idle": {

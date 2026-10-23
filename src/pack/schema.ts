@@ -24,7 +24,7 @@ export type FramesPoseDef = {
 }
 
 /**
- * Spine 骨骼动画（QQ 宠级动态质量路径）
+ * Spine 骨骼动画（高质量动态路径）
  * 目录约定见 docs/spine-pack.md
  */
 export type SpinePoseDef = {
