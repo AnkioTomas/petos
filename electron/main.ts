@@ -130,6 +130,19 @@ function copyDirSafe(src: string, dest: string) {
   }
 }
 
+/** 与 src/pack/schema.ts hasSrc 对齐：frames / spine / src 均可 */
+function poseHasAsset(p: unknown): boolean {
+  if (!p || typeof p !== 'object') return false
+  const o = p as Record<string, unknown>
+  if (o.type === 'frames') {
+    return Array.isArray(o.frames) && o.frames.length > 0 && o.frames.every((x) => typeof x === 'string')
+  }
+  if (o.type === 'spine') {
+    return typeof o.skeleton === 'string' && typeof o.atlas === 'string'
+  }
+  return typeof o.src === 'string' && !!(o.src as string).trim()
+}
+
 function readManifestSafe(packDir: string): { ok: true; data: unknown } | { ok: false; error: string } {
   try {
     const raw = fs.readFileSync(path.join(packDir, 'manifest.json'), 'utf8')
@@ -141,13 +154,40 @@ function readManifestSafe(packDir: string): { ok: true; data: unknown } | { ok: 
     if (!meta || typeof meta.name !== 'string' || !meta.name.trim()) {
       return { ok: false, error: '缺少 meta.name' }
     }
-    const poses = (data as { poses?: { idle?: { src?: unknown } } }).poses
-    if (!poses?.idle?.src || typeof poses.idle.src !== 'string') {
-      return { ok: false, error: '缺少 poses.idle.src' }
+    const poses = (data as { poses?: { idle?: unknown } }).poses
+    if (!poses || typeof poses !== 'object' || !poseHasAsset(poses.idle)) {
+      return { ok: false, error: '缺少可用的 poses.idle（需 src / frames / spine）' }
     }
     return { ok: true, data }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+function demoPackSourcePath(): string {
+  if (isDev) {
+    return path.join(app.getAppPath(), 'packs', 'demo-mochi')
+  }
+  return path.join(process.resourcesPath, 'packs', 'demo-mochi')
+}
+
+/** 首次无激活包时，把内置示例拷到 userData 并设为当前包 */
+function ensureDemoPackActive(): { dir: string; manifest: unknown; name: string } | null {
+  const src = demoPackSourcePath()
+  if (!fs.existsSync(path.join(src, 'manifest.json'))) return null
+  try {
+    const dest = copyFolderPack(src)
+    const parsed = readManifestSafe(dest)
+    if (!parsed.ok) {
+      fs.rmSync(dest, { recursive: true, force: true })
+      return null
+    }
+    const name = (parsed.data as { meta: { name: string } }).meta.name
+    store.set('activePackPath', dest)
+    store.set('activePackName', name)
+    return { dir: dest, manifest: parsed.data, name }
+  } catch {
+    return null
   }
 }
 
@@ -181,9 +221,17 @@ function registerIpc() {
     return path.join(process.resourcesPath, 'templates', 'blank-pack')
   })
 
+  ipcMain.handle('pack:getDemoPackPath', () => {
+    return demoPackSourcePath()
+  })
+
   ipcMain.handle('pack:loadActive', async () => {
-    const packPath = store.get('activePackPath')
+    let packPath = store.get('activePackPath')
     if (!packPath || !fs.existsSync(path.join(packPath, 'manifest.json'))) {
+      const demo = ensureDemoPackActive()
+      if (demo) {
+        return { pack: demo, error: null }
+      }
       return { pack: null, error: null }
     }
     const result = readManifestSafe(packPath)

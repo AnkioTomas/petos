@@ -55,10 +55,22 @@ npm run typecheck
 
 ## 使用说明（M1）
 
-1. 启动后默认是**几何占位宠**，可直接 **摸 / 喂 / 睡**（「玩」为占位）。
+1. 首次启动会自动激活内置示例包 **小糯**（`packs/demo-mochi`），可直接 **摸 / 喂 / 睡**（「玩」为占位）。卸下素材包后回退几何占位宠。
 2. 四维需求：饱腹、心情、精力、整洁；空闲会缓慢下降。危急时只软提示 / 想睡，**不会死亡**。
 3. 导入素材包：拖入 ZIP、选择 ZIP、选择文件夹，或点「导入空白模板」。
 4. 当前激活包名显示在面板上；可「卸下」回到占位宠。
+
+
+## 示例素材
+
+仓库自带官方示例包 [`packs/demo-mochi`](packs/demo-mochi)（角色名：**小糯**）：
+
+- 奶油桃色圆团子，512×512 透明 PNG 帧序列
+- 姿态：`idle`（呼吸+眨眼）/ `pet` / `eat` / `sleep`
+- 首次无激活包时应用会自动导入并启用
+- 也可在界面中「选择文件夹」指向该目录，或按同样结构自制素材包
+
+创作说明见包内 [`packs/demo-mochi/README.md`](packs/demo-mochi/README.md)。
 
 ## 素材包约定（schema 1）
 
@@ -96,6 +108,7 @@ npm run typecheck
 petos/
   icons.zip          # 品牌图标源包
   assets/brand/      # 解压后的 logo / favicon
+  packs/demo-mochi/  # 官方示例素材（小糯 · 帧序列）
   electron/          # main + preload
   src/
     engine/          # 需求衰减与交互

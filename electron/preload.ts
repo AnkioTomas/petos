@@ -25,6 +25,7 @@ const api = {
   choosePackZip: () => ipcRenderer.invoke('pack:chooseZip'),
   importDroppedZip: (filePath: string) => ipcRenderer.invoke('pack:importDroppedZip', filePath),
   importBlankTemplate: () => ipcRenderer.invoke('pack:importBlankTemplate'),
+  getDemoPackPath: () => ipcRenderer.invoke('pack:getDemoPackPath') as Promise<string>,
   clearPack: () => ipcRenderer.invoke('pack:clear'),
   resolveAssetUrl: (packDir: string, relSrc: string) =>
     ipcRenderer.invoke('pack:resolveAssetUrl', packDir, relSrc) as Promise<string | null>,

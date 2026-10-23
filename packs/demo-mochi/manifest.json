@@ -1,0 +1,85 @@
+{
+  "schema": 1,
+  "meta": {
+    "name": "小糯",
+    "author": "PetOS",
+    "description": "官方示例素材包：圆滚滚奶油小团子，帧序列演示摸/喂/睡。"
+  },
+  "poses": {
+    "idle": {
+      "type": "frames",
+      "frames": [
+        "idle/f0.png",
+        "idle/f1.png",
+        "idle/f2.png",
+        "idle/f3.png",
+        "idle/f4.png",
+        "idle/f5.png",
+        "idle/f6.png",
+        "idle/f7.png"
+      ],
+      "fps": 8,
+      "loop": true
+    },
+    "pet": {
+      "type": "frames",
+      "frames": [
+        "pet/f0.png",
+        "pet/f1.png",
+        "pet/f2.png",
+        "pet/f3.png",
+        "pet/f4.png",
+        "pet/f5.png"
+      ],
+      "fps": 10,
+      "loop": false
+    },
+    "eat": {
+      "type": "frames",
+      "frames": [
+        "eat/f0.png",
+        "eat/f1.png",
+        "eat/f2.png",
+        "eat/f3.png",
+        "eat/f4.png",
+        "eat/f5.png"
+      ],
+      "fps": 8,
+      "loop": false
+    },
+    "sleep": {
+      "type": "frames",
+      "frames": [
+        "sleep/f0.png",
+        "sleep/f1.png",
+        "sleep/f2.png",
+        "sleep/f3.png",
+        "sleep/f4.png",
+        "sleep/f5.png"
+      ],
+      "fps": 6,
+      "loop": true
+    }
+  },
+  "voice": {
+    "pet": [
+      "嗯嗯～",
+      "好软……",
+      "再摸一下嘛"
+    ],
+    "hungry": [
+      "肚子咕咕叫了……",
+      "想吃一口糯米团"
+    ],
+    "feed": [
+      "真香！",
+      "再来一口～",
+      "嚼嚼……"
+    ],
+    "sleep": [
+      "呼……",
+      "做个甜甜的梦",
+      "Zzz"
+    ]
+  }
+}
