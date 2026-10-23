@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "meta": {
+    "name": "空白模板",
+    "author": "you",
+    "description": "示范帧序列 idle（呼吸+眨眼）。可换成 WebP/Spine。禁止 SWF。"
+  },
+  "poses": {
+    "idle": {
+      "type": "frames",
+      "frames": [
+        "idle/f0.png",
+        "idle/f1.png",
+        "idle/f2.png",
+        "idle/f3.png",
+        "idle/f4.png",
+        "idle/f5.png",
+        "idle/f6.png",
+        "idle/f7.png"
+      ],
+      "fps": 8,
+      "loop": true
+    }
+  },
+  "voice": {
+    "pet": ["……", "嗯"],
+    "hungry": ["……"]
+  }
+}
