@@ -79,6 +79,13 @@ html, body, #root {
 }
 .pet-stage:active { cursor: grabbing; }
 
+.pet-scale {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  transform-origin: center bottom;
+  transition: transform 0.45s ease;
+}
 .pet-art-wrap { position: relative; display: inline-block; pointer-events: none; }
 .pet-art {
   width: 200px; height: 200px; object-fit: contain;
@@ -243,3 +250,17 @@ html, body, #root {
   0%, 100% { transform: translateY(0) rotate(-0.6deg); }
   50% { transform: translateY(-4px) rotate(0.6deg); }
 }
+
+.hud-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.hud-stage-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #5a6a7a;
+  min-width: 2em;
+}
+.hud-xp { flex: 1; }

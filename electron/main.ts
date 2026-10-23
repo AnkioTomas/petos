@@ -12,10 +12,23 @@ type NeedsState = {
   cleanliness: number
 }
 
+type GrowthState = {
+  xp: number
+  stage: 'baby' | 'teen' | 'youth' | 'adult'
+}
+
 type PersistShape = {
   needs: NeedsState
   activePackPath: string | null
   activePackName: string | null
+  growth: GrowthState
+}
+
+const STAGE_LABELS: Record<GrowthState['stage'], string> = {
+  baby: '幼体',
+  teen: '少年',
+  youth: '青年',
+  adult: '成年',
 }
 
 const store = new Store<PersistShape>({
@@ -24,6 +37,7 @@ const store = new Store<PersistShape>({
     needs: { hunger: 80, mood: 80, energy: 80, cleanliness: 80 },
     activePackPath: null,
     activePackName: null,
+    growth: { xp: 0, stage: 'baby' },
   },
 })
 
@@ -69,7 +83,15 @@ function sendMenuAction(action: string) {
 }
 
 function buildPetMenu(): Menu {
+  const growth = store.get('growth')
+  const stageLabel = STAGE_LABELS[growth?.stage ?? 'baby']
+  const xp = Math.max(0, Math.round(growth?.xp ?? 0))
   return Menu.buildFromTemplate([
+    {
+      label: `成长：${stageLabel} · ${xp} XP`,
+      enabled: false,
+    },
+    { type: 'separator' },
     {
       label: sleeping ? '叫醒' : '睡一会儿',
       click: () => sendMenuAction(sleeping ? 'wake' : 'sleep'),
@@ -284,9 +306,9 @@ function readManifestSafe(packDir: string): { ok: true; data: unknown } | { ok: 
 
 function demoPackSourcePath(): string {
   if (isDev) {
-    return path.join(app.getAppPath(), 'packs', 'demo-mochi')
+    return path.join(app.getAppPath(), 'packs', 'demo-logo-cat')
   }
-  return path.join(process.resourcesPath, 'packs', 'demo-mochi')
+  return path.join(process.resourcesPath, 'packs', 'demo-logo-cat')
 }
 
 /** 首次无激活包时，把内置示例拷到 userData 并设为当前包 */
@@ -315,6 +337,7 @@ function registerIpc() {
       needs: store.get('needs'),
       activePackPath: store.get('activePackPath'),
       activePackName: store.get('activePackName'),
+      growth: store.get('growth'),
     }
   })
 
@@ -322,6 +345,17 @@ function registerIpc() {
     store.set('needs', needs)
     return true
   })
+
+  ipcMain.handle('persist:setGrowth', (_e, growth: GrowthState) => {
+    if (!growth || typeof growth.xp !== 'number') return false
+    const stage = growth.stage
+    if (!STAGE_LABELS[stage]) return false
+    store.set('growth', { xp: Math.max(0, growth.xp), stage })
+    tray?.setContextMenu(buildPetMenu())
+    return true
+  })
+
+  ipcMain.handle('persist:getGrowth', () => store.get('growth'))
 
   ipcMain.handle('window:minimize', () => {
     mainWindow?.minimize()

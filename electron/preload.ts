@@ -12,8 +12,16 @@ const api = {
     needs: NeedsState
     activePackPath: string | null
     activePackName: string | null
+    growth: { xp: number; stage: 'baby' | 'teen' | 'youth' | 'adult' }
   }>,
   setNeeds: (needs: NeedsState) => ipcRenderer.invoke('persist:setNeeds', needs) as Promise<boolean>,
+  setGrowth: (growth: { xp: number; stage: 'baby' | 'teen' | 'youth' | 'adult' }) =>
+    ipcRenderer.invoke('persist:setGrowth', growth) as Promise<boolean>,
+  getGrowth: () =>
+    ipcRenderer.invoke('persist:getGrowth') as Promise<{
+      xp: number
+      stage: 'baby' | 'teen' | 'youth' | 'adult'
+    }>,
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
   showContextMenu: () => ipcRenderer.invoke('window:showContextMenu') as Promise<boolean>,

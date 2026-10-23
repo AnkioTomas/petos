@@ -1,19 +1,21 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
 import type { LoadedPack } from '../pack/schema'
 import { resolvePoseFallback, type VisualPose } from '../pack/fallbacks'
+import { STAGE_SCALE, type StageId } from '../engine/growth'
 import { PlaceholderPet } from './PlaceholderPet'
 import { PoseRenderer } from '../render/PoseRenderer'
 
 type Props = {
   pack: LoadedPack | null
   pose: VisualPose
+  stage?: StageId
   onPet: () => void
   onContextMenu?: () => void
 }
 
 const DRAG_THRESHOLD = 4
 
-export function PetView({ pack, pose, onPet, onContextMenu }: Props) {
+export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: Props) {
   const { def, visual, usedFallback } = resolvePoseFallback(pack?.manifest ?? null, pose)
   const dragRef = useRef<{
     active: boolean
@@ -31,6 +33,7 @@ export function PetView({ pack, pose, onPet, onContextMenu }: Props) {
     .join(' ')
 
   const showPlaceholder = !pack || !def
+  const scale = STAGE_SCALE[stage] ?? 1
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -80,19 +83,21 @@ export function PetView({ pack, pose, onPet, onContextMenu }: Props) {
         onContextMenu?.()
       }}
     >
-      {showPlaceholder ? (
-        <PlaceholderPet pose={pose} dim={visual.dim} bounce={visual.bounce} />
-      ) : (
-        <PoseRenderer
-          pack={pack}
-          poseKey={String(visual.poseKey)}
-          def={def}
-          visual={visual}
-          usedFallback={usedFallback}
-          alt={pack.name}
-          className="pet-art"
-        />
-      )}
+      <div className="pet-scale" style={{ transform: `scale(${scale})` }}>
+        {showPlaceholder ? (
+          <PlaceholderPet pose={pose} dim={visual.dim} bounce={visual.bounce} />
+        ) : (
+          <PoseRenderer
+            pack={pack}
+            poseKey={String(visual.poseKey)}
+            def={def}
+            visual={visual}
+            usedFallback={usedFallback}
+            alt={pack.name}
+            className="pet-art"
+          />
+        )}
+      </div>
     </div>
   )
 }

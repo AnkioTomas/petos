@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { DEFAULT_NEEDS, decayNeeds, isCritical, softCue, type Needs } from './engine/needs'
 import { applyAction, type ActionId } from './engine/interactions'
+import {
+  DEFAULT_GROWTH,
+  STAGE_LABELS,
+  applyGrowthXp,
+  type GrowthState,
+} from './engine/growth'
 import type { LoadedPack } from './pack/schema'
 import { hydratePack } from './pack/loader'
 import { pickVoice } from './pack/fallbacks'
@@ -31,6 +37,7 @@ async function applyImportResult(
 
 export default function App() {
   const [needs, setNeeds] = useState<Needs>(DEFAULT_NEEDS)
+  const [growth, setGrowth] = useState<GrowthState>(DEFAULT_GROWTH)
   const [pack, setPack] = useState<LoadedPack | null>(null)
   const [pose, setPose] = useState<VisualPose>('idle')
   const [sleeping, setSleeping] = useState(false)
@@ -44,9 +51,11 @@ export default function App() {
   const needsRef = useRef(needs)
   const sleepingRef = useRef(sleeping)
   const packRef = useRef(pack)
+  const growthRef = useRef(growth)
   needsRef.current = needs
   sleepingRef.current = sleeping
   packRef.current = pack
+  growthRef.current = growth
 
   const showBubble = useCallback((text: string | null, ms = 2800) => {
     if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current)
@@ -64,6 +73,10 @@ export default function App() {
         const persist = await window.pet.getPersist()
         if (cancelled) return
         setNeeds(persist.needs)
+        if (persist.growth) {
+          setGrowth(persist.growth)
+          growthRef.current = persist.growth
+        }
         const open = await window.pet.getPanelOpen()
         if (!cancelled) setPanelOpen(open)
         const { pack: raw, error } = await window.pet.loadActivePack()
@@ -137,6 +150,14 @@ export default function App() {
       setNeeds(result.needs)
       needsRef.current = result.needs
       void window.pet.setNeeds(result.needs)
+
+      const g = applyGrowthXp(growthRef.current, action)
+      setGrowth(g.state)
+      growthRef.current = g.state
+      void window.pet.setGrowth(g.state)
+      if (g.leveledUp && g.to) {
+        showBubble(`长大啦 · ${STAGE_LABELS[g.to]}`)
+      }
 
       if (typeof result.sleeping === 'boolean') {
         setSleeping(result.sleeping)
@@ -244,18 +265,23 @@ export default function App() {
         <PetView
           pack={pack}
           pose={sleeping ? 'sleep' : pose}
+          stage={growth.stage}
           onPet={() => onAction('pet')}
           onContextMenu={() => void window.pet.showContextMenu()}
         />
 
-        {(hovering || hudPinned) && <StatusHud needs={needs} pinned={hudPinned} />}
+        {(hovering || hudPinned) && (
+          <StatusHud needs={needs} growth={growth} pinned={hudPinned} />
+        )}
       </div>
 
       {panelOpen && (
         <div className="panel-layer">
           <div className="panel-header">
             <strong>PetOS</strong>
-            <span className="sub">{pack?.name ?? '我的宠物'}</span>
+            <span className="sub">
+              {pack?.name ?? '我的宠物'} · {STAGE_LABELS[growth.stage]}
+            </span>
             <button type="button" className="panel-close" onClick={() => void togglePanel()}>
               收起
             </button>

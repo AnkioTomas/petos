@@ -65,21 +65,22 @@ npm run typecheck
 | 悬停 | 短暂显示迷你需求条 |
 | 菜单栏托盘图标 | 同右键菜单 |
 
-1. 首次启动自动激活内置示例包 **小糯**（`packs/demo-mochi`）。
+1. 首次启动自动激活内置示例包 **品牌猫**（`packs/demo-logo-cat`，由主题 Logo 生成）。
 2. 四维需求：饱腹、心情、精力、整洁；空闲缓慢下降。危急只软提示 / 想睡，**不会死亡**。
-3. 「打开面板」会临时放大窗口，露出完整控件与素材导入区；「收起」回到纯桌宠。
+3. **成长**：幼体 → 少年 → 青年 → 成年；摸/喂/睡/玩攒 XP，体型随阶段缩放；**不会因惩罚掉级清档**。
+4. 「打开面板」会临时放大窗口，露出完整控件与素材导入区；「收起」回到纯桌宠。
 
 
 ## 示例素材
 
-仓库自带官方示例包 [`packs/demo-mochi`](packs/demo-mochi)（角色名：**小糯**）：
+仓库自带官方示例包 [`packs/demo-logo-cat`](packs/demo-logo-cat)（角色名：**品牌猫**）：
 
-- 奶油桃色圆团子，512×512 透明 PNG 帧序列
-- 姿态：`idle`（呼吸+眨眼）/ `pet` / `eat` / `sleep`
-- 首次无激活包时应用会自动导入并启用
+- 主题 Logo 奶油猫（`assets/brand/logo.png`）衍生的 512×512 透明 PNG 帧序列
+- 姿态：`idle`（呼吸+眨眼）/ `pet`（挤压）/ `eat` / `sleep`（闭眼）
+- 首次无激活包时应用会自动导入并启用；成长阶段用缩放表现体型
 - 也可在界面中「选择文件夹」指向该目录，或按同样结构自制素材包
 
-创作说明见包内 [`packs/demo-mochi/README.md`](packs/demo-mochi/README.md)。
+创作说明见包内 [`packs/demo-logo-cat/README.md`](packs/demo-logo-cat/README.md)。
 
 ## 素材包约定（schema 1）
 
@@ -117,10 +118,11 @@ npm run typecheck
 petos/
   icons.zip          # 品牌图标源包
   assets/brand/      # 解压后的 logo / favicon
-  packs/demo-mochi/  # 官方示例素材（小糯 · 帧序列）
+  packs/demo-logo-cat/ # 官方示例（品牌猫 · Logo 帧序列）
+  src/engine/growth.ts  # 成长阶段 / XP
   electron/          # main + preload
   src/
-    engine/          # 需求衰减与交互
+    engine/          # 需求衰减、交互、成长
     pack/            # schema / 加载 / 回退
     ui/              # 占位宠、导入、控制条
     render/          # 帧序列 / WebP / Spine 姿态渲染
