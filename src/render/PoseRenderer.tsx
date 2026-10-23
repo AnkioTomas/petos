@@ -49,7 +49,7 @@ export function PoseRenderer({ pack, poseKey, def, visual, usedFallback, alt, cl
             atlasUrl={atlas}
             textureUrl={pack.assetUrls[`${poseKey}::texture`]}
             animation={def.animation ?? poseKey}
-            loop={def.loop ?? poseKey === 'idle' || poseKey === 'sleep'}
+            loop={def.loop ?? (poseKey === 'idle' || poseKey === 'sleep')}
             skin={def.skin}
             className={className}
             onFallback={() => setMode('image-fallback')}
