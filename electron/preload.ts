@@ -2,9 +2,33 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 export type NeedsState = {
   hunger: number
+  cleanliness: number
   mood: number
   energy: number
-  cleanliness: number
+}
+
+export type GrowthState = {
+  xp: number
+  stage: 'baby' | 'teen' | 'youth' | 'adult'
+  level: number
+}
+
+export type WalletState = {
+  gold: number
+  diamond: number
+  tide: number
+}
+
+export type InventoryItem = {
+  sku: string
+  quantity: number
+}
+
+export type OccupationState = {
+  kind: 'work' | 'study' | 'trip' | null
+  jobId: string | null
+  startedAt: number | null
+  duration: number | null
 }
 
 const api = {
@@ -12,16 +36,30 @@ const api = {
     needs: NeedsState
     activePackPath: string | null
     activePackName: string | null
-    growth: { xp: number; stage: 'baby' | 'teen' | 'youth' | 'adult' }
+    growth: GrowthState
+    wallet: WalletState
+    inventory: InventoryItem[]
+    occupation: OccupationState
+    lastSaved: number | null
   }>,
   setNeeds: (needs: NeedsState) => ipcRenderer.invoke('persist:setNeeds', needs) as Promise<boolean>,
-  setGrowth: (growth: { xp: number; stage: 'baby' | 'teen' | 'youth' | 'adult' }) =>
+  setGrowth: (growth: GrowthState) =>
     ipcRenderer.invoke('persist:setGrowth', growth) as Promise<boolean>,
-  getGrowth: () =>
-    ipcRenderer.invoke('persist:getGrowth') as Promise<{
-      xp: number
-      stage: 'baby' | 'teen' | 'youth' | 'adult'
-    }>,
+  getGrowth: () => ipcRenderer.invoke('persist:getGrowth') as Promise<GrowthState>,
+  setWallet: (wallet: WalletState) =>
+    ipcRenderer.invoke('persist:setWallet', wallet) as Promise<boolean>,
+  getWallet: () => ipcRenderer.invoke('persist:getWallet') as Promise<WalletState>,
+  setInventory: (inventory: InventoryItem[]) =>
+    ipcRenderer.invoke('persist:setInventory', inventory) as Promise<boolean>,
+  getInventory: () => ipcRenderer.invoke('persist:getInventory') as Promise<InventoryItem[]>,
+  setOccupation: (occupation: OccupationState) =>
+    ipcRenderer.invoke('persist:setOccupation', occupation) as Promise<boolean>,
+  getOccupation: () => ipcRenderer.invoke('persist:getOccupation') as Promise<OccupationState>,
+  setPluginData: (pluginId: string, data: Record<string, unknown>) =>
+    ipcRenderer.invoke('persist:setPluginData', pluginId, data) as Promise<boolean>,
+  getPluginData: (pluginId: string) =>
+    ipcRenderer.invoke('persist:getPluginData', pluginId) as Promise<Record<string, unknown>>,
+  save: () => ipcRenderer.invoke('persist:save') as Promise<boolean>,
   minimize: () => ipcRenderer.invoke('window:minimize'),
   close: () => ipcRenderer.invoke('window:close'),
   showContextMenu: () => ipcRenderer.invoke('window:showContextMenu') as Promise<boolean>,

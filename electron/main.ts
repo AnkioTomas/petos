@@ -7,14 +7,33 @@ import JSZip from 'jszip'
 
 type NeedsState = {
   hunger: number
+  cleanliness: number
   mood: number
   energy: number
-  cleanliness: number
 }
 
 type GrowthState = {
   xp: number
   stage: 'baby' | 'teen' | 'youth' | 'adult'
+  level: number
+}
+
+type WalletState = {
+  gold: number
+  diamond: number
+  tide: number
+}
+
+type InventoryItem = {
+  sku: string
+  quantity: number
+}
+
+type OccupationState = {
+  kind: 'work' | 'study' | 'trip' | null
+  jobId: string | null
+  startedAt: number | null
+  duration: number | null
 }
 
 type PersistShape = {
@@ -22,6 +41,11 @@ type PersistShape = {
   activePackPath: string | null
   activePackName: string | null
   growth: GrowthState
+  wallet: WalletState
+  inventory: InventoryItem[]
+  occupation: OccupationState
+  plugins: Record<string, Record<string, unknown>>
+  lastSaved: number | null
 }
 
 const STAGE_LABELS: Record<GrowthState['stage'], string> = {
@@ -34,10 +58,19 @@ const STAGE_LABELS: Record<GrowthState['stage'], string> = {
 const store = new Store<PersistShape>({
   name: 'petos',
   defaults: {
-    needs: { hunger: 80, mood: 80, energy: 80, cleanliness: 80 },
+    needs: { hunger: 80, cleanliness: 80, mood: 80, energy: 80 },
     activePackPath: null,
     activePackName: null,
-    growth: { xp: 0, stage: 'baby' },
+    growth: { xp: 0, stage: 'baby', level: 1 },
+    wallet: { gold: 320, diamond: 2, tide: 0 },
+    inventory: [
+      { sku: 'food_fish_snack', quantity: 3 },
+      { sku: 'food_cat_food', quantity: 1 },
+      { sku: 'clean_wipes', quantity: 1 },
+    ],
+    occupation: { kind: null, jobId: null, startedAt: null, duration: null },
+    plugins: {},
+    lastSaved: null,
   },
 })
 
@@ -84,11 +117,16 @@ function sendMenuAction(action: string) {
 
 function buildPetMenu(): Menu {
   const growth = store.get('growth')
+  const wallet = store.get('wallet')
   const stageLabel = STAGE_LABELS[growth?.stage ?? 'baby']
-  const xp = Math.max(0, Math.round(growth?.xp ?? 0))
+  const level = growth?.level ?? 1
   return Menu.buildFromTemplate([
     {
-      label: `成长：${stageLabel} · ${xp} XP`,
+      label: `${stageLabel} · Lv.${level}`,
+      enabled: false,
+    },
+    {
+      label: `金币 ${wallet?.gold ?? 0} · 钻石 ${wallet?.diamond ?? 0}`,
       enabled: false,
     },
     { type: 'separator' },
@@ -97,14 +135,13 @@ function buildPetMenu(): Menu {
       click: () => sendMenuAction(sleeping ? 'wake' : 'sleep'),
     },
     {
-      label: '喂食',
-      enabled: !sleeping,
-      click: () => sendMenuAction('feed'),
-    },
-    {
       label: '摸摸',
       enabled: !sleeping,
       click: () => sendMenuAction('pet'),
+    },
+    {
+      label: '照料小铺',
+      click: () => sendMenuAction('shop'),
     },
     { type: 'separator' },
     {
@@ -338,6 +375,10 @@ function registerIpc() {
       activePackPath: store.get('activePackPath'),
       activePackName: store.get('activePackName'),
       growth: store.get('growth'),
+      wallet: store.get('wallet'),
+      inventory: store.get('inventory'),
+      occupation: store.get('occupation'),
+      lastSaved: store.get('lastSaved'),
     }
   })
 
@@ -350,12 +391,56 @@ function registerIpc() {
     if (!growth || typeof growth.xp !== 'number') return false
     const stage = growth.stage
     if (!STAGE_LABELS[stage]) return false
-    store.set('growth', { xp: Math.max(0, growth.xp), stage })
+    store.set('growth', { xp: Math.max(0, growth.xp), stage, level: growth.level ?? 1 })
     tray?.setContextMenu(buildPetMenu())
     return true
   })
 
   ipcMain.handle('persist:getGrowth', () => store.get('growth'))
+
+  ipcMain.handle('persist:setWallet', (_e, wallet: WalletState) => {
+    if (!wallet || typeof wallet.gold !== 'number') return false
+    store.set('wallet', {
+      gold: Math.max(0, Math.floor(wallet.gold)),
+      diamond: Math.max(0, Math.floor(wallet.diamond)),
+      tide: Math.max(0, Math.floor(wallet.tide)),
+    })
+    return true
+  })
+
+  ipcMain.handle('persist:getWallet', () => store.get('wallet'))
+
+  ipcMain.handle('persist:setInventory', (_e, inventory: InventoryItem[]) => {
+    if (!Array.isArray(inventory)) return false
+    store.set('inventory', inventory)
+    return true
+  })
+
+  ipcMain.handle('persist:getInventory', () => store.get('inventory'))
+
+  ipcMain.handle('persist:setOccupation', (_e, occupation: OccupationState) => {
+    store.set('occupation', occupation)
+    return true
+  })
+
+  ipcMain.handle('persist:getOccupation', () => store.get('occupation'))
+
+  ipcMain.handle('persist:setPluginData', (_e, pluginId: string, data: Record<string, unknown>) => {
+    const plugins = store.get('plugins')
+    plugins[pluginId] = data
+    store.set('plugins', plugins)
+    return true
+  })
+
+  ipcMain.handle('persist:getPluginData', (_e, pluginId: string) => {
+    const plugins = store.get('plugins')
+    return plugins[pluginId] ?? {}
+  })
+
+  ipcMain.handle('persist:save', () => {
+    store.set('lastSaved', Date.now())
+    return true
+  })
 
   ipcMain.handle('window:minimize', () => {
     mainWindow?.minimize()

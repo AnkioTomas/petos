@@ -1,10 +1,14 @@
+/**
+ * 旧版控制组件（已废弃）
+ * 保留作为兼容层，新版使用 Footbar + ItemPanel
+ */
+
 import type { Needs, NeedKey } from '../engine/needs'
 import { NEED_LABELS, CRITICAL_THRESHOLD, LOW_THRESHOLD } from '../engine/needs'
 
 type Props = {
   needs: Needs
   sleeping: boolean
-  onAction: (a: 'pet' | 'feed' | 'sleep' | 'play') => void
 }
 
 function barColor(v: number): string {
@@ -13,7 +17,7 @@ function barColor(v: number): string {
   return '#7bc96f'
 }
 
-export function Controls({ needs, sleeping, onAction }: Props) {
+export function Controls({ needs, sleeping: _sleeping }: Props) {
   const keys = Object.keys(NEED_LABELS) as NeedKey[]
   return (
     <div className="controls">
@@ -30,20 +34,6 @@ export function Controls({ needs, sleeping, onAction }: Props) {
             <span className="need-val">{Math.round(needs[k])}</span>
           </div>
         ))}
-      </div>
-      <div className="action-row">
-        <button type="button" onClick={() => onAction('pet')} disabled={sleeping}>
-          摸
-        </button>
-        <button type="button" onClick={() => onAction('feed')} disabled={sleeping}>
-          喂
-        </button>
-        <button type="button" onClick={() => onAction('sleep')}>
-          {sleeping ? '叫醒' : '睡'}
-        </button>
-        <button type="button" className="stub" onClick={() => onAction('play')} disabled={sleeping} title="M1 占位">
-          玩
-        </button>
       </div>
     </div>
   )

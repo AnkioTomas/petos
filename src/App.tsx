@@ -1,20 +1,71 @@
+/**
+ * PetOS CORE 主应用
+ * redesign.md v2.3 · 核心陪伴养成 + 插件架构
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DEFAULT_NEEDS, decayNeeds, isCritical, softCue, type Needs } from './engine/needs'
-import { applyAction, type ActionId } from './engine/interactions'
+import { DEFAULT_NEEDS, decayNeeds, isCritical, softCue, CRITICAL_THRESHOLD, clampNeeds, type Needs } from './engine/needs'
+import { applyItemUse, isWeak } from './engine/interactions'
 import {
   DEFAULT_GROWTH,
   STAGE_LABELS,
   applyGrowthXp,
   type GrowthState,
 } from './engine/growth'
+import { DEFAULT_WALLET, debit, credit, type Wallet } from './engine/wallet'
+import {
+  DEFAULT_INVENTORY,
+  addToInventory,
+  removeFromInventory,
+  type Inventory,
+  type ItemDef,
+  type ItemCategory,
+} from './engine/items'
+import {
+  DEFAULT_OCCUPATION,
+  requestOccupation,
+  releaseOccupation,
+  RECALL_COEFFICIENT,
+  type OccupationState,
+} from './engine/occupation'
+import {
+  createIdleState,
+  createBehaviorState,
+  shouldTriggerBehavior,
+  isBehaviorComplete,
+  pickRandomBehavior,
+  canPerformBehavior,
+  mapBehaviorToPose,
+  type DeskState,
+} from './engine/desk'
 import type { LoadedPack } from './pack/schema'
 import { hydratePack } from './pack/loader'
 import { pickVoice } from './pack/fallbacks'
 import type { VisualPose } from './pack/fallbacks'
 import { PetView } from './ui/PetView'
-import { Controls } from './ui/Controls'
-import { ImportPanel } from './ui/ImportPanel'
 import { StatusHud } from './ui/StatusHud'
+import { Footbar, CORE_FOOTBAR_GROUPS, type FootbarGroup } from './ui/Footbar'
+import { ItemPanel } from './ui/ItemPanel'
+import { ShopPanel } from './ui/ShopPanel'
+import { ProfilePanel } from './ui/ProfilePanel'
+import { ImportPanel } from './ui/ImportPanel'
+import { OutingsPanel } from './plugins/outings/OutingsPanel'
+import { DailyQuestsPanel } from './plugins/quests/DailyQuestsPanel'
+import { getJobById } from './plugins/outings/jobs'
+import type { JobDef } from './plugins/outings/types'
+import { generateDailyQuests, getDayKey, updateQuestProgress, type DailyQuest } from './plugins/quests/daily'
+
+type PanelType = 
+  | { type: 'none' }
+  | { type: 'item'; category: ItemCategory }
+  | { type: 'shop' }
+  | { type: 'profile' }
+  | { type: 'settings' }
+  | { type: 'packs' }
+  | { type: 'work' }
+  | { type: 'study' }
+  | { type: 'trip' }
+  | { type: 'daily_quests' }
 
 async function applyImportResult(
   result: { ok?: boolean; cancelled?: boolean; error?: string; pack?: { dir: string; manifest: unknown; name: string } },
@@ -38,24 +89,48 @@ async function applyImportResult(
 export default function App() {
   const [needs, setNeeds] = useState<Needs>(DEFAULT_NEEDS)
   const [growth, setGrowth] = useState<GrowthState>(DEFAULT_GROWTH)
+  const [wallet, setWallet] = useState<Wallet>(DEFAULT_WALLET)
+  const [inventory, setInventory] = useState<Inventory>(DEFAULT_INVENTORY)
+  const [occupation, setOccupation] = useState<OccupationState>(DEFAULT_OCCUPATION)
   const [pack, setPack] = useState<LoadedPack | null>(null)
   const [pose, setPose] = useState<VisualPose>('idle')
   const [sleeping, setSleeping] = useState(false)
+  const [weak, setWeak] = useState(false)
   const [bubble, setBubble] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const [hovering, setHovering] = useState(false)
   const [hudPinned, setHudPinned] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [activePanel, setActivePanel] = useState<PanelType>({ type: 'none' })
+  const [isDragging, setIsDragging] = useState(false)
+  const [deskState, setDeskState] = useState<DeskState>(createIdleState())
+  const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([])
+  const [questDayKey, setQuestDayKey] = useState('')
+  
   const poseTimer = useRef<number | null>(null)
   const bubbleTimer = useRef<number | null>(null)
+  const deskTimer = useRef<number | null>(null)
   const needsRef = useRef(needs)
   const sleepingRef = useRef(sleeping)
+  const weakRef = useRef(weak)
   const packRef = useRef(pack)
   const growthRef = useRef(growth)
+  const walletRef = useRef(wallet)
+  const inventoryRef = useRef(inventory)
+  const occupationRef = useRef(occupation)
+  const deskStateRef = useRef(deskState)
+  const dailyQuestsRef = useRef(dailyQuests)
+  
   needsRef.current = needs
   sleepingRef.current = sleeping
+  weakRef.current = weak
   packRef.current = pack
   growthRef.current = growth
+  walletRef.current = wallet
+  inventoryRef.current = inventory
+  occupationRef.current = occupation
+  deskStateRef.current = deskState
+  dailyQuestsRef.current = dailyQuests
 
   const showBubble = useCallback((text: string | null, ms = 2800) => {
     if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current)
@@ -65,7 +140,16 @@ export default function App() {
     }
   }, [])
 
-  // boot: load persist + pack
+  // Initialize daily quests
+  useEffect(() => {
+    const today = getDayKey()
+    if (today !== questDayKey) {
+      setQuestDayKey(today)
+      setDailyQuests(generateDailyQuests(today))
+    }
+  }, [questDayKey])
+
+  // Boot: load persist + pack
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -76,6 +160,18 @@ export default function App() {
         if (persist.growth) {
           setGrowth(persist.growth)
           growthRef.current = persist.growth
+        }
+        if (persist.wallet) {
+          setWallet(persist.wallet)
+          walletRef.current = persist.wallet
+        }
+        if (persist.inventory) {
+          setInventory(persist.inventory)
+          inventoryRef.current = persist.inventory
+        }
+        if (persist.occupation) {
+          setOccupation(persist.occupation)
+          occupationRef.current = persist.occupation
         }
         const open = await window.pet.getPanelOpen()
         if (!cancelled) setPanelOpen(open)
@@ -95,7 +191,7 @@ export default function App() {
     }
   }, [showBubble])
 
-  // idle decay loop
+  // Idle decay loop
   useEffect(() => {
     if (!ready) return
     let last = performance.now()
@@ -108,14 +204,57 @@ export default function App() {
       setNeeds(next)
       void window.pet.setNeeds(next)
 
-      if (!sleepingRef.current && isCritical(next) && next.energy <= 15) {
+      const nowWeak = isWeak(next)
+      if (nowWeak !== weakRef.current) {
+        setWeak(nowWeak)
+        weakRef.current = nowWeak
+        if (nowWeak && !sleepingRef.current) {
+          showBubble('身体不舒服……需要休息')
+          setSleeping(true)
+          sleepingRef.current = true
+          void window.pet.setSleeping(true)
+        }
+      }
+
+      if (!sleepingRef.current && isCritical(next) && next.energy <= CRITICAL_THRESHOLD) {
         showBubble(softCue(next))
       }
     }, 1000)
     return () => clearInterval(id)
   }, [ready, showBubble])
 
-  // soft cue when low (don't stomp an existing bubble)
+  // Desk behavior loop
+  useEffect(() => {
+    if (!ready) return
+    const tick = () => {
+      const state = deskStateRef.current
+      const canBehave = canPerformBehavior(weakRef.current, sleepingRef.current, occupationRef.current.kind !== null)
+      
+      if (!canBehave) {
+        if (state.behavior !== 'idle' && state.behavior !== 'sleep' && state.behavior !== 'weak') {
+          setDeskState(createIdleState())
+        }
+        return
+      }
+      
+      if (state.behavior !== 'idle' && isBehaviorComplete(state)) {
+        setDeskState(createIdleState())
+        return
+      }
+      
+      if (shouldTriggerBehavior(state)) {
+        const behavior = pickRandomBehavior(true, null)
+        setDeskState(createBehaviorState(behavior))
+      }
+    }
+    
+    deskTimer.current = window.setInterval(tick, 500)
+    return () => {
+      if (deskTimer.current) clearInterval(deskTimer.current)
+    }
+  }, [ready])
+
+  // Soft cue when low
   useEffect(() => {
     if (!ready) return
     const cue = softCue(needs)
@@ -143,83 +282,260 @@ export default function App() {
     }
   }, [])
 
-  const onAction = useCallback(
-    (action: ActionId) => {
-      const currentPack = packRef.current
-      const result = applyAction(needsRef.current, action, sleepingRef.current)
-      setNeeds(result.needs)
-      needsRef.current = result.needs
-      void window.pet.setNeeds(result.needs)
+  const handlePet = useCallback(() => {
+    if (sleepingRef.current) return
+    const next = {
+      ...needsRef.current,
+      mood: Math.min(100, needsRef.current.mood + 12),
+      energy: Math.max(0, needsRef.current.energy - 1),
+    }
+    setNeeds(next)
+    needsRef.current = next
+    void window.pet.setNeeds(next)
 
-      const g = applyGrowthXp(growthRef.current, action)
+    const g = applyGrowthXp(growthRef.current, 2)
+    setGrowth(g.state)
+    growthRef.current = g.state
+    void window.pet.setGrowth(g.state)
+    if (g.stageChanged && g.to) {
+      showBubble(`长大啦 · ${STAGE_LABELS[g.to]}`)
+    }
+
+    // Update quest progress
+    const newQuests = updateQuestProgress(dailyQuestsRef.current, 'pet_pet', 1)
+    setDailyQuests(newQuests)
+    dailyQuestsRef.current = newQuests
+
+    const line = pickVoice(packRef.current?.manifest ?? null, 'pet', '呼噜～')
+    showBubble(line)
+    flashPose('pet', 900)
+  }, [flashPose, showBubble])
+
+  const handleUseItem = useCallback((item: ItemDef) => {
+    const inv = removeFromInventory(inventoryRef.current, item.sku, 1)
+    if (!inv) {
+      showBubble('没有这个物品了')
+      return
+    }
+    setInventory(inv)
+    inventoryRef.current = inv
+    void window.pet.setInventory(inv)
+
+    const result = applyItemUse(needsRef.current, item)
+    setNeeds(result.needs)
+    needsRef.current = result.needs
+    void window.pet.setNeeds(result.needs)
+
+    if (result.xpGained) {
+      const g = applyGrowthXp(growthRef.current, result.xpGained)
       setGrowth(g.state)
       growthRef.current = g.state
       void window.pet.setGrowth(g.state)
-      if (g.leveledUp && g.to) {
+      if (g.stageChanged && g.to) {
         showBubble(`长大啦 · ${STAGE_LABELS[g.to]}`)
+        return
       }
+    }
 
-      if (typeof result.sleeping === 'boolean') {
-        setSleeping(result.sleeping)
-        sleepingRef.current = result.sleeping
+    // Update quest progress
+    const questType = item.category === 'food' ? 'feed_pet' : 
+                      item.category === 'clean' ? 'clean_pet' : 
+                      item.category === 'toy' ? 'play_pet' : null
+    if (questType) {
+      const newQuests = updateQuestProgress(dailyQuestsRef.current, questType, 1)
+      setDailyQuests(newQuests)
+      dailyQuestsRef.current = newQuests
+    }
+
+    const line = pickVoice(packRef.current?.manifest ?? null, item.category, result.bubble ?? '')
+    showBubble(line || result.bubble || null)
+    flashPose(result.pose, 900)
+  }, [flashPose, showBubble])
+
+  const handleBuyItem = useCallback((item: ItemDef) => {
+    const result = debit(walletRef.current, item.price.currency, item.price.amount)
+    if (!result.ok) {
+      showBubble('金币不够啦')
+      return
+    }
+    setWallet(result.wallet)
+    walletRef.current = result.wallet
+    void window.pet.setWallet(result.wallet)
+
+    const inv = addToInventory(inventoryRef.current, item.sku, 1)
+    setInventory(inv)
+    inventoryRef.current = inv
+    void window.pet.setInventory(inv)
+
+    // Update quest progress
+    const newQuests = updateQuestProgress(dailyQuestsRef.current, 'buy_items', 1)
+    setDailyQuests(newQuests)
+    dailyQuestsRef.current = newQuests
+
+    showBubble(`买到了 ${item.name}！`)
+  }, [showBubble])
+
+  const handleSleep = useCallback(() => {
+    if (sleepingRef.current) {
+      if (needsRef.current.energy < 30) {
+        showBubble('还没休息好……')
+        return
       }
+      setSleeping(false)
+      sleepingRef.current = false
+      void window.pet.setSleeping(false)
+      showBubble('醒啦')
+      flashPose('idle', 400)
+    } else {
+      setSleeping(true)
+      sleepingRef.current = true
+      void window.pet.setSleeping(true)
+      showBubble('Zzz……')
+      setPose('sleep')
+    }
+  }, [flashPose, showBubble])
 
-      const voiceKey =
-        action === 'pet' ? 'pet' : action === 'feed' ? 'feed' : action === 'sleep' ? 'sleep' : 'play'
-      const line = pickVoice(currentPack?.manifest ?? null, voiceKey, result.bubble ?? '')
-      showBubble(line || result.bubble || null)
+  const handleStartOuting = useCallback((job: JobDef) => {
+    const result = requestOccupation(
+      occupationRef.current,
+      job.kind,
+      job.id,
+      job.duration,
+      weakRef.current
+    )
+    if (!result.ok) {
+      showBubble(result.reason === 'weak_state' ? '身体虚弱，无法外出' : '正在忙碌中')
+      return
+    }
+    setOccupation(result.state)
+    occupationRef.current = result.state
+    void window.pet.setOccupation(result.state)
+    showBubble(`出发去${job.name}啦！`)
+    setActivePanel({ type: 'none' })
+  }, [showBubble])
 
-      const visual: VisualPose =
-        result.pose === 'eat'
-          ? 'eat'
-          : result.pose === 'pet'
-            ? 'pet'
-            : result.pose === 'sleep'
-              ? 'sleep'
-              : result.pose === 'play'
-                ? 'play'
-                : 'idle'
+  const handleRecallOuting = useCallback(() => {
+    const occ = occupationRef.current
+    if (!occ.kind || !occ.jobId) return
+    
+    const job = getJobById(occ.jobId)
+    if (!job) return
+    
+    const elapsedTime = occ.startedAt ? Date.now() - occ.startedAt : 0
+    const isComplete = elapsedTime >= (occ.duration ?? 0)
+    const { state: newOcc, coefficient } = releaseOccupation(occ, !isComplete)
+    const multiplier = isComplete ? 1.0 : coefficient
+    
+    // Apply rewards
+    const rewards = job.rewards
+    if (rewards.gold) {
+      const earned = Math.floor(rewards.gold * multiplier)
+      const cr = credit(walletRef.current, 'gold', earned)
+      if (cr.ok) {
+        setWallet(cr.wallet)
+        walletRef.current = cr.wallet
+        void window.pet.setWallet(cr.wallet)
+      }
+    }
+    
+    if (rewards.xp) {
+      const earnedXp = Math.floor(rewards.xp * multiplier)
+      const g = applyGrowthXp(growthRef.current, earnedXp)
+      setGrowth(g.state)
+      growthRef.current = g.state
+      void window.pet.setGrowth(g.state)
+    }
+    
+    if (rewards.mood) {
+      const earnedMood = Math.floor(rewards.mood * multiplier)
+      const newNeeds = clampNeeds({
+        ...needsRef.current,
+        mood: needsRef.current.mood + earnedMood,
+      })
+      setNeeds(newNeeds)
+      needsRef.current = newNeeds
+      void window.pet.setNeeds(newNeeds)
+    }
+    
+    setOccupation(newOcc)
+    occupationRef.current = newOcc
+    void window.pet.setOccupation(newOcc)
+    
+    const msg = isComplete 
+      ? `${job.name}完成！获得 ${rewards.gold ?? 0} 金币` 
+      : `提前召回，获得 ${Math.floor((rewards.gold ?? 0) * RECALL_COEFFICIENT)} 金币`
+    showBubble(msg)
+  }, [showBubble])
 
-      if (result.sleeping) {
-        if (poseTimer.current) window.clearTimeout(poseTimer.current)
-        setPose('sleep')
-      } else if (action === 'sleep') {
-        flashPose('idle', 400)
+  const handleClaimQuest = useCallback((questId: string) => {
+    const quest = dailyQuestsRef.current.find(q => q.id === questId)
+    if (!quest || quest.claimed || !quest.completed) return
+    
+    // Give rewards
+    const cr = credit(walletRef.current, 'gold', quest.reward.gold)
+    if (cr.ok) {
+      setWallet(cr.wallet)
+      walletRef.current = cr.wallet
+      void window.pet.setWallet(cr.wallet)
+    }
+    
+    const g = applyGrowthXp(growthRef.current, quest.reward.xp)
+    setGrowth(g.state)
+    growthRef.current = g.state
+    void window.pet.setGrowth(g.state)
+    
+    // Mark claimed
+    const newQuests = dailyQuestsRef.current.map(q => 
+      q.id === questId ? { ...q, claimed: true } : q
+    )
+    setDailyQuests(newQuests)
+    dailyQuestsRef.current = newQuests
+    
+    showBubble(`领取奖励：${quest.reward.gold} 金币`)
+  }, [showBubble])
+
+  const handleFootbarClick = useCallback((groupId: string, itemId: string) => {
+    if (groupId === 'daily') {
+      const category = itemId as ItemCategory
+      setActivePanel({ type: 'item', category })
+    } else if (groupId === 'profile' && itemId === 'profile') {
+      setActivePanel({ type: 'profile' })
+    } else if (groupId === 'settings') {
+      if (itemId === 'packs') {
+        setActivePanel({ type: 'packs' })
       } else {
-        const poseDef = currentPack?.manifest.poses?.[visual]
-        let ms = 900
-        if (poseDef && 'ms' in poseDef && typeof poseDef.ms === 'number') ms = poseDef.ms
-        else if (poseDef?.type === 'frames') {
-          const fps = poseDef.fps ?? 12
-          ms = Math.round(((poseDef.frames?.length ?? 8) / fps) * 1000)
-        }
-        flashPose(visual, ms)
+        setActivePanel({ type: 'settings' })
       }
-    },
-    [flashPose, showBubble],
-  )
+    } else if (groupId === 'interact') {
+      if (itemId === 'work') setActivePanel({ type: 'work' })
+      else if (itemId === 'study') setActivePanel({ type: 'study' })
+      else if (itemId === 'trip') setActivePanel({ type: 'trip' })
+    } else if (groupId === 'tools') {
+      if (itemId === 'daily_quests') setActivePanel({ type: 'daily_quests' })
+    }
+  }, [])
 
   const togglePanel = useCallback(async () => {
     const next = !panelOpen
     const applied = await window.pet.setPanelOpen(next)
     setPanelOpen(applied)
+    if (!applied) {
+      setActivePanel({ type: 'none' })
+    }
   }, [panelOpen])
 
-  // native menu / tray actions
   useEffect(() => {
     return window.pet.onMenuAction((action) => {
       void (async () => {
         switch (action) {
           case 'pet':
-          case 'feed':
-          case 'play':
-            onAction(action)
+            handlePet()
             break
           case 'sleep':
-            if (!sleepingRef.current) onAction('sleep')
+            handleSleep()
             break
           case 'wake':
-            if (sleepingRef.current) onAction('sleep')
+            if (sleepingRef.current) handleSleep()
             break
           case 'import-zip': {
             const r = await window.pet.choosePackZip()
@@ -242,12 +558,120 @@ export default function App() {
           case 'show-status':
             setHudPinned((v) => !v)
             break
+          case 'shop':
+            setActivePanel({ type: 'shop' })
+            if (!panelOpen) await togglePanel()
+            break
           default:
             break
         }
       })()
     })
-  }, [onAction, showBubble, togglePanel])
+  }, [handlePet, handleSleep, showBubble, togglePanel, panelOpen])
+
+  const footbarGroups: FootbarGroup[] = [
+    ...CORE_FOOTBAR_GROUPS,
+    {
+      id: 'shop',
+      label: '商店',
+      items: [{ id: 'shop', label: '照料小铺', icon: '🏪' }],
+    },
+    {
+      id: 'interact',
+      label: '交互',
+      items: [
+        { id: 'work', label: '兼职码头', icon: '⚓' },
+        { id: 'study', label: '邻岛学堂', icon: '📚' },
+        { id: 'trip', label: '远岛散步', icon: '🏝️' },
+      ],
+    },
+    {
+      id: 'tools',
+      label: '工具',
+      items: [
+        { id: 'daily_quests', label: '今日岛课', icon: '📋' },
+      ],
+    },
+  ]
+
+  const deskPose: VisualPose = mapBehaviorToPose(deskState.behavior) as VisualPose
+  const effectivePose: VisualPose = sleeping ? 'sleep' : 
+                                    weak ? 'weak' :
+                                    occupation.kind ? 'idle' :
+                                    isDragging ? 'lift' :
+                                    pose !== 'idle' ? pose :
+                                    deskPose
+
+  const renderActivePanel = () => {
+    switch (activePanel.type) {
+      case 'item':
+        return (
+          <ItemPanel
+            category={activePanel.category}
+            inventory={inventory}
+            onUseItem={handleUseItem}
+            onClose={() => setActivePanel({ type: 'none' })}
+            disabled={sleeping || occupation.kind !== null}
+          />
+        )
+      case 'shop':
+        return (
+          <ShopPanel
+            wallet={wallet}
+            onBuyItem={handleBuyItem}
+            onClose={() => setActivePanel({ type: 'none' })}
+          />
+        )
+      case 'profile':
+        return (
+          <ProfilePanel
+            needs={needs}
+            growth={growth}
+            wallet={wallet}
+            onClose={() => setActivePanel({ type: 'none' })}
+          />
+        )
+      case 'packs':
+        return <ImportPanel pack={pack} onPackChange={setPack} />
+      case 'settings':
+        return (
+          <div className="settings-panel">
+            <div className="settings-header">
+              <h3>设置</h3>
+              <button type="button" className="panel-close" onClick={() => setActivePanel({ type: 'none' })}>
+                关闭
+              </button>
+            </div>
+            <p className="settings-info">PetOS v2.3 CORE + Plugins</p>
+            <p className="settings-info">已启用插件：外出三分、今日岛课</p>
+          </div>
+        )
+      case 'work':
+      case 'study':
+      case 'trip':
+        return (
+          <OutingsPanel
+            kind={activePanel.type}
+            occupation={occupation}
+            stage={growth.stage}
+            isWeak={weak}
+            onStart={handleStartOuting}
+            onRecall={handleRecallOuting}
+            onClose={() => setActivePanel({ type: 'none' })}
+          />
+        )
+      case 'daily_quests':
+        return (
+          <DailyQuestsPanel
+            quests={dailyQuests}
+            onClaim={handleClaimQuest}
+            onClose={() => setActivePanel({ type: 'none' })}
+          />
+        )
+      default:
+        return null
+    }
+  }
 
   return (
     <div
@@ -262,11 +686,21 @@ export default function App() {
           </div>
         )}
 
+        {occupation.kind && (
+          <div className="empty-nest-note">
+            外出中：{occupation.kind === 'work' ? '兼职码头' : occupation.kind === 'study' ? '邻岛学堂' : '远岛散步'}
+          </div>
+        )}
+
         <PetView
           pack={pack}
-          pose={sleeping ? 'sleep' : pose}
+          pose={effectivePose}
           stage={growth.stage}
-          onPet={() => onAction('pet')}
+          deskBehavior={deskState.behavior}
+          isDragging={isDragging}
+          onPet={handlePet}
+          onDragStart={() => setIsDragging(true)}
+          onDragEnd={() => setIsDragging(false)}
           onContextMenu={() => void window.pet.showContextMenu()}
         />
 
@@ -280,14 +714,35 @@ export default function App() {
           <div className="panel-header">
             <strong>PetOS</strong>
             <span className="sub">
-              {pack?.name ?? '我的宠物'} · {STAGE_LABELS[growth.stage]}
+              {pack?.name ?? '糯糯'} · {STAGE_LABELS[growth.stage]}
+              {weak && <span className="weak-badge">虚弱</span>}
+              {occupation.kind && <span className="outing-badge">外出中</span>}
             </span>
             <button type="button" className="panel-close" onClick={() => void togglePanel()}>
               收起
             </button>
           </div>
-          <Controls needs={needs} sleeping={sleeping} onAction={onAction} />
-          <ImportPanel pack={pack} onPackChange={setPack} />
+          
+          <Footbar
+            groups={footbarGroups}
+            onItemClick={(gId, iId) => {
+              if (gId === 'shop' && iId === 'shop') {
+                setActivePanel({ type: 'shop' })
+              } else {
+                handleFootbarClick(gId, iId)
+              }
+            }}
+          />
+          
+          <div className="panel-content">
+            {renderActivePanel()}
+          </div>
+          
+          <div className="panel-actions">
+            <button type="button" onClick={handleSleep} disabled={occupation.kind !== null}>
+              {sleeping ? '叫醒' : '睡觉'}
+            </button>
+          </div>
         </div>
       )}
     </div>

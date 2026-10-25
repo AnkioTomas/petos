@@ -23,7 +23,7 @@ export function StatusHud({ needs, growth, pinned }: Props) {
   const prog = xpProgressInStage(growth)
   return (
     <div className={`status-hud ${pinned ? 'pinned' : ''}`}>
-      <div className="hud-stage" title={`经验 ${growth.xp}`}>
+      <div className="hud-stage" title={`Lv.${growth.level} · 经验 ${growth.xp}`}>
         <span className="hud-stage-label">{STAGE_LABELS[growth.stage]}</span>
         <div className="hud-track hud-xp">
           <div className="hud-fill" style={{ width: `${prog.ratio * 100}%`, background: '#7eb6e8' }} />

@@ -1,27 +1,36 @@
-/** 四维需求：0–100。危急只休眠可唤醒，无死亡。 */
+/**
+ * 四维需求：0–100。危急时虚弱回窝，永无死亡。
+ * 命名对齐 economy.md v2.3：肚子/毛顺/想玩/安康
+ */
 
 export type Needs = {
-  hunger: number // 饱腹
-  mood: number // 心情
-  energy: number // 精力
-  cleanliness: number // 整洁
+  hunger: number    // 肚子
+  cleanliness: number // 毛顺
+  mood: number      // 想玩
+  energy: number    // 安康
 }
 
 export type NeedKey = keyof Needs
 
 export const NEED_LABELS: Record<NeedKey, string> = {
-  hunger: '饱腹',
-  mood: '心情',
-  energy: '精力',
-  cleanliness: '整洁',
+  hunger: '肚子',
+  cleanliness: '毛顺',
+  mood: '想玩',
+  energy: '安康',
 }
 
-/** 每秒衰减量（空闲） */
+/**
+ * 每秒衰减量（economy.md §3）
+ * hunger: 0.05/s = 3.0/min
+ * mood: 0.04/s = 2.4/min
+ * energy: 0.035/s = 2.1/min
+ * cleanliness: 0.025/s = 1.5/min
+ */
 export const IDLE_DECAY_PER_SEC: Needs = {
-  hunger: 0.08,
-  mood: 0.05,
-  energy: 0.04,
-  cleanliness: 0.03,
+  hunger: 0.05,
+  mood: 0.04,
+  energy: 0.035,
+  cleanliness: 0.025,
 }
 
 export const CRITICAL_THRESHOLD = 15
@@ -34,27 +43,31 @@ export function clampNeed(n: number): number {
 export function clampNeeds(n: Needs): Needs {
   return {
     hunger: clampNeed(n.hunger),
+    cleanliness: clampNeed(n.cleanliness),
     mood: clampNeed(n.mood),
     energy: clampNeed(n.energy),
-    cleanliness: clampNeed(n.cleanliness),
   }
 }
 
+/**
+ * 衰减需求（economy.md §3）
+ * 睡眠倍率：hunger×0.3, mood×0.2, clean×0.2
+ * 睡眠 energy 回复：0.25/s
+ */
 export function decayNeeds(n: Needs, dtSec: number, sleeping: boolean): Needs {
   if (sleeping) {
-    // 睡觉时精力回升，其他缓慢下降
     return clampNeeds({
       hunger: n.hunger - IDLE_DECAY_PER_SEC.hunger * 0.3 * dtSec,
+      cleanliness: n.cleanliness - IDLE_DECAY_PER_SEC.cleanliness * 0.2 * dtSec,
       mood: n.mood - IDLE_DECAY_PER_SEC.mood * 0.2 * dtSec,
       energy: n.energy + 0.25 * dtSec,
-      cleanliness: n.cleanliness - IDLE_DECAY_PER_SEC.cleanliness * 0.2 * dtSec,
     })
   }
   return clampNeeds({
     hunger: n.hunger - IDLE_DECAY_PER_SEC.hunger * dtSec,
+    cleanliness: n.cleanliness - IDLE_DECAY_PER_SEC.cleanliness * dtSec,
     mood: n.mood - IDLE_DECAY_PER_SEC.mood * dtSec,
     energy: n.energy - IDLE_DECAY_PER_SEC.energy * dtSec,
-    cleanliness: n.cleanliness - IDLE_DECAY_PER_SEC.cleanliness * dtSec,
   })
 }
 
@@ -76,7 +89,7 @@ export function softCue(n: Needs): string | null {
 
 export const DEFAULT_NEEDS: Needs = {
   hunger: 80,
+  cleanliness: 80,
   mood: 80,
   energy: 80,
-  cleanliness: 80,
 }
