@@ -87,6 +87,8 @@ html, body, #root {
   transition: transform 0.45s ease;
 }
 .pet-art-wrap { position: relative; display: inline-block; pointer-events: none; }
+.pet-art-wrap--live2d { pointer-events: auto; }
+.pet-art-wrap--live2d canvas { display: block; }
 .pet-art {
   width: 200px; height: 200px; object-fit: contain;
   image-rendering: auto;
@@ -613,6 +615,19 @@ html, body, #root {
   margin-left: 6px;
 }
 
+.fidelity-badge {
+  display: inline-block;
+  background: #9b59b6;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+.fidelity-badge.placeholder {
+  background: #e8a85d;
+}
+
 /* Empty nest note */
 .empty-nest-note {
   position: absolute;
@@ -903,9 +918,15 @@ html, body, #root {
 }
 .pet-art-wrap .spine-player-canvas { width: 100% !important; height: 100% !important; }
 
+/* Idle sway only for non-Live2D packs */
 .pet-stage:not(.pet-sleep):not(.pet-bounce) .pet-art {
   animation: petIdleSway 3s ease-in-out infinite;
   transform-origin: 50% 90%;
+}
+.pet-art-wrap--live2d + .pet-art,
+.pet-art-wrap--live2d .pet-art,
+.pet-art-wrap--live2d canvas {
+  animation: none !important;
 }
 @keyframes petIdleSway {
   0%, 100% { transform: translateY(0) rotate(-0.6deg); }
