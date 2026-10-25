@@ -1,6 +1,6 @@
-import { isManifestV1, type LoadedPack, type PackManifestV1, type PoseDef } from './schema'
+import { isManifestV1, isLive2DPack, type LoadedPack, type PackManifestV1, type PoseDef } from './schema'
 
-const POSE_KEYS = ['idle', 'pet', 'eat', 'sleep', 'sad', 'hunger', 'play'] as const
+const POSE_KEYS = ['idle', 'pet', 'eat', 'sleep', 'sad', 'hunger', 'play', 'walk', 'jump', 'hide', 'lift', 'weak'] as const
 
 async function resolve(dir: string, rel: string): Promise<string | null> {
   try {
@@ -32,19 +32,45 @@ async function collectPoseAssets(
     }
     return
   }
+  if (pose.type === 'live2d') {
+    assetUrls[`${poseKey}::model`] = await resolve(dir, pose.model)
+    return
+  }
   // image / webp / default
   if ('src' in pose && pose.src) {
     assetUrls[`${poseKey}::src`] = await resolve(dir, pose.src)
   }
 }
 
-/** idle 是否有可用资源（图 / 至少一帧 / spine 骨架） */
-function idleUsable(idle: PoseDef, assetUrls: Record<string, string | null>): boolean {
+async function collectLive2DAssets(
+  dir: string,
+  manifest: PackManifestV1,
+  assetUrls: Record<string, string | null>,
+) {
+  if (!manifest.live2d?.model) return
+  assetUrls['live2d::model'] = await resolve(dir, manifest.live2d.model)
+  if (manifest.live2d.forms?.juvenile) {
+    assetUrls['live2d::juvenile'] = await resolve(dir, manifest.live2d.forms.juvenile)
+  }
+  if (manifest.live2d.forms?.adult) {
+    assetUrls['live2d::adult'] = await resolve(dir, manifest.live2d.forms.adult)
+  }
+}
+
+/** idle 是否有可用资源（图 / 至少一帧 / spine 骨架 / live2d 模型） */
+function idleUsable(idle: PoseDef | undefined, assetUrls: Record<string, string | null>, manifest: PackManifestV1): boolean {
+  if (isLive2DPack(manifest)) {
+    return !!assetUrls['live2d::model']
+  }
+  if (!idle) return false
   if (idle.type === 'frames') {
     return pose.framesHaveAny(assetUrls, 'idle', idle.frames.length)
   }
   if (idle.type === 'spine') {
     return !!(assetUrls['idle::skeleton'] && assetUrls['idle::atlas'])
+  }
+  if (idle.type === 'live2d') {
+    return !!assetUrls['idle::model']
   }
   return !!assetUrls['idle::src']
 }
@@ -67,11 +93,13 @@ export async function hydratePack(
   const manifest = manifestRaw as PackManifestV1
   const assetUrls: Record<string, string | null> = {}
 
+  await collectLive2DAssets(dir, manifest, assetUrls)
+
   for (const key of POSE_KEYS) {
-    await collectPoseAssets(dir, key, manifest.poses[key], assetUrls)
+    await collectPoseAssets(dir, key, manifest.poses?.[key], assetUrls)
   }
 
-  if (!idleUsable(manifest.poses.idle, assetUrls)) return null
+  if (!idleUsable(manifest.poses?.idle, assetUrls, manifest)) return null
 
   return {
     dir,

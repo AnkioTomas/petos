@@ -1,10 +1,17 @@
-import { useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useCallback, forwardRef, useImperativeHandle, type PointerEvent as ReactPointerEvent } from 'react'
 import type { LoadedPack } from '../pack/schema'
+import { isLive2DPack } from '../pack/schema'
 import { resolvePoseFallback, type VisualPose } from '../pack/fallbacks'
 import { STAGE_SCALE, type StageId } from '../engine/growth'
 import { PlaceholderPet } from './PlaceholderPet'
-import { PoseRenderer } from '../render/PoseRenderer'
+import { PoseRenderer, type PoseRendererHandle } from '../render/PoseRenderer'
 import type { DeskBehavior } from '../engine/desk'
+import type { Live2DPoseRendererHandle, MotionGroup } from '../render/Live2DPoseRenderer'
+
+export interface PetViewHandle {
+  live2d: Live2DPoseRendererHandle | null
+  isLive2D: boolean
+}
 
 type Props = {
   pack: LoadedPack | null
@@ -17,32 +24,30 @@ type Props = {
   onDragEnd?: () => void
   onContextMenu?: () => void
   mousePosition?: { x: number; y: number } | null
+  initialMotion?: MotionGroup
+  onLive2DReady?: () => void
 }
 
 const DRAG_THRESHOLD = 4
 
-export function PetView({ 
-  pack, 
-  pose, 
-  stage = 'adult', 
-  deskBehavior = 'idle',
-  isDragging = false,
-  onPet, 
-  onDragStart,
-  onDragEnd,
-  onContextMenu,
-  mousePosition,
-}: Props) {
-  const effectivePose = isDragging ? 'lift' : pose
-  const { def, visual, usedFallback } = resolvePoseFallback(pack?.manifest ?? null, effectivePose)
-  const dragRef = useRef<{
-    active: boolean
-    moved: boolean
-    offsetX: number
-    offsetY: number
-  } | null>(null)
+type AnimClassParams = {
+  visual: { bounce?: boolean; dim?: boolean }
+  effectivePose: VisualPose
+  isDragging: boolean
+  deskBehavior: DeskBehavior
+  isLive2D: boolean
+}
 
-  const animClass = [
+function buildAnimClass({ visual, effectivePose, isDragging, deskBehavior, isLive2D }: AnimClassParams): string {
+  if (isLive2D) {
+    return [
+      visual.dim ? 'pet-dim' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+  }
+
+  return [
     visual.bounce ? 'pet-bounce' : '',
     visual.dim ? 'pet-dim' : '',
     effectivePose === 'sleep' ? 'pet-sleep' : '',
@@ -56,8 +61,53 @@ export function PetView({
   ]
     .filter(Boolean)
     .join(' ')
+}
 
-  const showPlaceholder = !pack || !def
+export const PetView = forwardRef<PetViewHandle, Props>(function PetView(
+  { 
+    pack, 
+    pose, 
+    stage = 'adult', 
+    deskBehavior = 'idle',
+    isDragging = false,
+    onPet, 
+    onDragStart,
+    onDragEnd,
+    onContextMenu,
+    mousePosition,
+    initialMotion,
+    onLive2DReady,
+  },
+  ref
+) {
+  const effectivePose = isDragging ? 'lift' : pose
+  const { def, visual, usedFallback } = resolvePoseFallback(pack?.manifest ?? null, effectivePose)
+  const poseRendererRef = useRef<PoseRendererHandle>(null)
+  const dragRef = useRef<{
+    active: boolean
+    moved: boolean
+    offsetX: number
+    offsetY: number
+  } | null>(null)
+
+  const isLive2D = pack ? isLive2DPack(pack.manifest) : false
+
+  useImperativeHandle(ref, () => ({
+    get live2d() {
+      return poseRendererRef.current?.live2d ?? null
+    },
+    isLive2D,
+  }), [isLive2D])
+
+  const animClass = buildAnimClass({
+    visual,
+    effectivePose,
+    isDragging,
+    deskBehavior,
+    isLive2D,
+  })
+
+  const showPlaceholder = !pack || (!def && !isLive2D)
   const scale = STAGE_SCALE[stage] ?? 1
 
   const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
@@ -126,6 +176,7 @@ export function PetView({
           />
         ) : (
           <PoseRenderer
+            ref={poseRendererRef}
             pack={pack}
             poseKey={String(visual.poseKey)}
             def={def}
@@ -134,9 +185,11 @@ export function PetView({
             alt={pack.name}
             className="pet-art"
             mousePosition={mousePosition}
+            initialMotion={initialMotion}
+            onLive2DReady={onLive2DReady}
           />
         )}
       </div>
     </div>
   )
-}
+})

@@ -39,10 +39,12 @@ import {
   type DeskState,
 } from './engine/desk'
 import type { LoadedPack } from './pack/schema'
+import { isLive2DPack } from './pack/schema'
 import { hydratePack } from './pack/loader'
-import { pickVoice } from './pack/fallbacks'
+import { pickVoice, checkLive2DFidelity, getPackFidelityLabel } from './pack/fallbacks'
 import type { VisualPose } from './pack/fallbacks'
-import { PetView } from './ui/PetView'
+import { PetView, type PetViewHandle } from './ui/PetView'
+import { createDeskDirector, type DeskDirector } from './engine/desk-director'
 import { StatusHud } from './ui/StatusHud'
 import { Footbar, CORE_FOOTBAR_GROUPS, type FootbarGroup } from './ui/Footbar'
 import { ItemPanel } from './ui/ItemPanel'
@@ -106,6 +108,8 @@ export default function App() {
   const [deskState, setDeskState] = useState<DeskState>(createIdleState())
   const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([])
   const [questDayKey, setQuestDayKey] = useState('')
+  const [, setLive2DReady] = useState(false)
+  const [packFidelityLabel, setPackFidelityLabel] = useState<string | null>(null)
   
   const poseTimer = useRef<number | null>(null)
   const bubbleTimer = useRef<number | null>(null)
@@ -120,6 +124,8 @@ export default function App() {
   const occupationRef = useRef(occupation)
   const deskStateRef = useRef(deskState)
   const dailyQuestsRef = useRef(dailyQuests)
+  const petViewRef = useRef<PetViewHandle>(null)
+  const deskDirectorRef = useRef<DeskDirector | null>(null)
   
   needsRef.current = needs
   sleepingRef.current = sleeping
@@ -131,6 +137,34 @@ export default function App() {
   occupationRef.current = occupation
   deskStateRef.current = deskState
   dailyQuestsRef.current = dailyQuests
+
+  const isLive2D = pack ? isLive2DPack(pack.manifest) : false
+
+  const handleLive2DReady = useCallback(() => {
+    setLive2DReady(true)
+    
+    const live2dHandle = petViewRef.current?.live2d
+    if (live2dHandle && pack) {
+      const availableMotions = live2dHandle.getAvailableMotions()
+      const { fidelity, isPlaceholder } = checkLive2DFidelity(pack.manifest, availableMotions)
+      setPackFidelityLabel(getPackFidelityLabel(fidelity, isPlaceholder))
+      
+      if (!deskDirectorRef.current) {
+        deskDirectorRef.current = createDeskDirector({
+          motionMapping: pack.manifest.live2d?.motions,
+        })
+      }
+      
+      deskDirectorRef.current.setRenderer({ current: live2dHandle })
+      deskDirectorRef.current.startIdlePool()
+    }
+  }, [pack])
+
+  useEffect(() => {
+    return () => {
+      deskDirectorRef.current?.dispose()
+    }
+  }, [])
 
   const showBubble = useCallback((text: string | null, ms = 2800) => {
     if (bubbleTimer.current) window.clearTimeout(bubbleTimer.current)
@@ -226,29 +260,43 @@ export default function App() {
   // Desk behavior loop
   useEffect(() => {
     if (!ready) return
-    const tick = () => {
+    const tick = async () => {
       const state = deskStateRef.current
+      const director = deskDirectorRef.current
       const canBehave = canPerformBehavior(weakRef.current, sleepingRef.current, occupationRef.current.kind !== null)
       
       if (!canBehave) {
         if (state.behavior !== 'idle' && state.behavior !== 'sleep' && state.behavior !== 'weak') {
           setDeskState(createIdleState())
+          if (weakRef.current && director) {
+            await director.lockForWeak()
+          } else if (sleepingRef.current && director) {
+            await director.lockForSleep()
+          } else if (occupationRef.current.kind && director) {
+            await director.lockForOccupation()
+          }
         }
         return
       }
       
       if (state.behavior !== 'idle' && isBehaviorComplete(state)) {
         setDeskState(createIdleState())
+        if (director) {
+          await director.playBehavior('idle')
+        }
         return
       }
       
       if (shouldTriggerBehavior(state)) {
         const behavior = pickRandomBehavior(true, null)
         setDeskState(createBehaviorState(behavior))
+        if (director) {
+          await director.playBehavior(behavior)
+        }
       }
     }
     
-    deskTimer.current = window.setInterval(tick, 500)
+    deskTimer.current = window.setInterval(() => void tick(), 500)
     return () => {
       if (deskTimer.current) clearInterval(deskTimer.current)
     }
@@ -308,6 +356,11 @@ export default function App() {
 
     const line = pickVoice(packRef.current?.manifest ?? null, 'pet', '呼噜～')
     showBubble(line)
+    
+    const director = deskDirectorRef.current
+    if (director) {
+      void director.playInteraction('pet')
+    }
     flashPose('pet', 900)
   }, [flashPose, showBubble])
 
@@ -349,6 +402,15 @@ export default function App() {
 
     const line = pickVoice(packRef.current?.manifest ?? null, item.category, result.bubble ?? '')
     showBubble(line || result.bubble || null)
+    
+    const director = deskDirectorRef.current
+    if (director) {
+      const motionType = item.category === 'food' ? 'eat' : 
+                         item.category === 'toy' ? 'play' : null
+      if (motionType) {
+        void director.playInteraction(motionType)
+      }
+    }
     flashPose(result.pose, 900)
   }, [flashPose, showBubble])
 
@@ -376,6 +438,7 @@ export default function App() {
   }, [showBubble])
 
   const handleSleep = useCallback(() => {
+    const director = deskDirectorRef.current
     if (sleepingRef.current) {
       if (needsRef.current.energy < 30) {
         showBubble('还没休息好……')
@@ -385,12 +448,18 @@ export default function App() {
       sleepingRef.current = false
       void window.pet.setSleeping(false)
       showBubble('醒啦')
+      if (director) {
+        void director.unlock()
+      }
       flashPose('idle', 400)
     } else {
       setSleeping(true)
       sleepingRef.current = true
       void window.pet.setSleeping(true)
       showBubble('Zzz……')
+      if (director) {
+        void director.lockForSleep()
+      }
       setPose('sleep')
     }
   }, [flashPose, showBubble])
@@ -693,15 +762,23 @@ export default function App() {
         )}
 
         <PetView
+          ref={petViewRef}
           pack={pack}
           pose={effectivePose}
           stage={growth.stage}
-          deskBehavior={deskState.behavior}
+          deskBehavior={isLive2D ? 'idle' : deskState.behavior}
           isDragging={isDragging}
           onPet={handlePet}
-          onDragStart={() => setIsDragging(true)}
-          onDragEnd={() => setIsDragging(false)}
+          onDragStart={() => {
+            setIsDragging(true)
+            void deskDirectorRef.current?.handleDragStart()
+          }}
+          onDragEnd={() => {
+            setIsDragging(false)
+            void deskDirectorRef.current?.handleDragEnd()
+          }}
           onContextMenu={() => void window.pet.showContextMenu()}
+          onLive2DReady={handleLive2DReady}
         />
 
         {(hovering || hudPinned) && (
@@ -715,6 +792,7 @@ export default function App() {
             <strong>PetOS</strong>
             <span className="sub">
               {pack?.name ?? '糯糯'} · {STAGE_LABELS[growth.stage]}
+              {packFidelityLabel && <span className="fidelity-badge">{packFidelityLabel}</span>}
               {weak && <span className="weak-badge">虚弱</span>}
               {occupation.kind && <span className="outing-badge">外出中</span>}
             </span>

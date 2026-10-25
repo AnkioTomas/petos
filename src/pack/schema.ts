@@ -49,12 +49,25 @@ export type SpinePoseDef = {
  * Live2D Cubism（官方默认路径）
  * redesign.md §5.1 官方默认 Live2D Cubism 4 + Core 许可合规
  */
+export type Live2DMotionMapping = {
+  idle?: string[]
+  walk?: string[]
+  jump?: string[]
+  hide?: string[]
+  lift?: string[]
+  sleep?: string[]
+  weak?: string[]
+  pet?: string[]
+  eat?: string[]
+  play?: string[]
+}
+
 export type Live2DPoseDef = {
   type: 'live2d'
   /** .model3.json 路径 */
   model: string
   /** motion 映射表（可选覆盖默认） */
-  motions?: Record<string, string[]>
+  motions?: Live2DMotionMapping
   /** 眼球跟随参数名 */
   eyeParams?: { x: string; y: string }
 }
@@ -81,17 +94,7 @@ export type PackManifestV1 = {
       adult?: string
     }
     /** motion 组到动画名的映射 */
-    motions?: {
-      idle?: string[]
-      walk?: string[]
-      jump?: string[]
-      hide?: string[]
-      lift?: string[]
-      sleep?: string[]
-      pet?: string[]
-      eat?: string[]
-      play?: string[]
-    }
+    motions?: Live2DMotionMapping
     /** 眼球跟随参数 */
     eyeParams?: { x: string; y: string }
   }
