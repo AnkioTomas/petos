@@ -1,8 +1,16 @@
+/**
+ * 成长引擎（CORE）
+ * economy.md §7 Demo 压缩表：0/30/90/200
+ * 形态：juvenile（幼年/少年/青年）→ adult（成年）
+ */
+
 export type StageId = 'baby' | 'teen' | 'youth' | 'adult'
+export type FormId = 'juvenile' | 'adult'
 
 export type GrowthState = {
   xp: number
   stage: StageId
+  level: number
 }
 
 export const STAGE_ORDER: StageId[] = ['baby', 'teen', 'youth', 'adult']
@@ -14,7 +22,12 @@ export const STAGE_LABELS: Record<StageId, string> = {
   adult: '成年',
 }
 
-/** Visual scale for packs without per-stage art (logo demo uses this). */
+export const FORM_LABELS: Record<FormId, string> = {
+  juvenile: '幼年形态',
+  adult: '成年形态',
+}
+
+/** Visual scale for packs without per-stage art. */
 export const STAGE_SCALE: Record<StageId, number> = {
   baby: 0.72,
   teen: 0.85,
@@ -22,22 +35,18 @@ export const STAGE_SCALE: Record<StageId, number> = {
   adult: 1,
 }
 
-/** Cumulative XP thresholds — never decreases stage. */
+/**
+ * Demo 压缩表（economy.md §7.3）
+ * baby: 0, teen: 30, youth: 90, adult: 200
+ */
 const STAGE_MIN_XP: Record<StageId, number> = {
   baby: 0,
-  teen: 40,
-  youth: 120,
-  adult: 280,
+  teen: 30,
+  youth: 90,
+  adult: 200,
 }
 
-export const XP_REWARDS: Record<'pet' | 'feed' | 'sleep' | 'play', number> = {
-  pet: 2,
-  feed: 3,
-  sleep: 2,
-  play: 4,
-}
-
-export const DEFAULT_GROWTH: GrowthState = { xp: 0, stage: 'baby' }
+export const DEFAULT_GROWTH: GrowthState = { xp: 0, stage: 'baby', level: 1 }
 
 export function stageForXp(xp: number): StageId {
   let stage: StageId = 'baby'
@@ -45,6 +54,20 @@ export function stageForXp(xp: number): StageId {
     if (xp >= STAGE_MIN_XP[id]) stage = id
   }
   return stage
+}
+
+/** 形态：成年 XP ≥200 → adult，否则 juvenile */
+export function formForStage(stage: StageId): FormId {
+  return stage === 'adult' ? 'adult' : 'juvenile'
+}
+
+export function formForXp(xp: number): FormId {
+  return formForStage(stageForXp(xp))
+}
+
+/** Demo 等级计算：简化为 1 + floor(xp / 20) */
+export function levelForXp(xp: number): number {
+  return 1 + Math.floor(xp / 20)
 }
 
 export function xpProgressInStage(state: GrowthState): { current: number; nextAt: number | null; ratio: number } {
@@ -62,16 +85,18 @@ export function xpProgressInStage(state: GrowthState): { current: number; nextAt
 
 export function applyGrowthXp(
   state: GrowthState,
-  action: 'pet' | 'feed' | 'sleep' | 'play',
-): { state: GrowthState; xpGained: number; leveledUp: boolean; from?: StageId; to?: StageId } {
-  const xpGained = XP_REWARDS[action]
-  const xp = Math.max(0, state.xp + xpGained)
+  xpAmount: number,
+): { state: GrowthState; xpGained: number; leveledUp: boolean; stageChanged: boolean; from?: StageId; to?: StageId } {
+  const xp = Math.max(0, state.xp + xpAmount)
   const stage = stageForXp(xp)
-  const leveledUp = stage !== state.stage
+  const level = levelForXp(xp)
+  const stageChanged = stage !== state.stage
+  const leveledUp = level > state.level || stageChanged
   return {
-    state: { xp, stage },
-    xpGained,
+    state: { xp, stage, level },
+    xpGained: xpAmount,
     leveledUp,
-    ...(leveledUp ? { from: state.stage, to: stage } : {}),
+    stageChanged,
+    ...(stageChanged ? { from: state.stage, to: stage } : {}),
   }
 }
