@@ -237,6 +237,81 @@ html, body, #root {
   50% { transform: translateY(-5px); }
 }
 
+/* Desk behaviors */
+.ph-walk { animation: phWalk 0.4s ease-in-out infinite; transform-origin: 50% 100%; }
+@keyframes phWalk {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-3px) rotate(2deg); }
+}
+
+.ph-jump { animation: phJump 0.5s ease-out; transform-origin: 50% 100%; }
+@keyframes phJump {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-30px); }
+  100% { transform: translateY(0); }
+}
+
+.ph-leg-left { animation: legLeft 0.4s ease-in-out infinite; transform-origin: 50% 50%; }
+.ph-leg-right { animation: legRight 0.4s ease-in-out infinite; transform-origin: 50% 50%; }
+@keyframes legLeft {
+  0%, 100% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+}
+@keyframes legRight {
+  0%, 100% { transform: translateX(3px); }
+  50% { transform: translateX(-3px); }
+}
+
+.pet-walk-left .pet-art, .pet-walk-left svg { animation: walkLeft 3s linear; }
+.pet-walk-right .pet-art, .pet-walk-right svg { animation: walkRight 3s linear; }
+@keyframes walkLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-60px); }
+}
+@keyframes walkRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(60px); }
+}
+
+.pet-jumping .pet-art, .pet-jumping svg { animation: petJump 0.6s ease-out; }
+@keyframes petJump {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-40px) scale(1.05); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.pet-hide-left .pet-art, .pet-hide-left svg {
+  animation: hideLeft 0.5s ease-out forwards;
+}
+.pet-hide-right .pet-art, .pet-hide-right svg {
+  animation: hideRight 0.5s ease-out forwards;
+}
+@keyframes hideLeft {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(-80px); opacity: 0.3; }
+}
+@keyframes hideRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(80px); opacity: 0.3; }
+}
+
+.pet-lift .pet-art, .pet-lift svg {
+  animation: petLift 0.2s ease-out forwards;
+}
+@keyframes petLift {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-15px) rotate(8deg); }
+}
+
+.pet-weak .pet-art, .pet-weak svg {
+  filter: brightness(0.7) saturate(0.8);
+  animation: weakPulse 2s ease-in-out infinite;
+}
+@keyframes weakPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.5; }
+}
+
 /* Footbar */
 .footbar {
   display: flex;
@@ -526,6 +601,301 @@ html, body, #root {
   padding: 1px 6px;
   border-radius: 4px;
   margin-left: 6px;
+}
+
+.outing-badge {
+  display: inline-block;
+  background: #5a9bd4;
+  color: #fff;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+/* Empty nest note */
+.empty-nest-note {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  z-index: 3;
+}
+
+/* Outings Panel */
+.outings-panel {
+  padding: 8px;
+}
+.outings-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.outings-header h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+.outings-warning, .outings-busy {
+  background: rgba(232, 93, 93, 0.1);
+  border: 1px solid rgba(232, 93, 93, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+  color: #c43c3c;
+  font-size: 12px;
+}
+.outings-busy {
+  background: rgba(90, 155, 212, 0.1);
+  border-color: rgba(90, 155, 212, 0.3);
+  color: #5a9bd4;
+}
+.outings-active {
+  background: rgba(123, 201, 111, 0.1);
+  border: 1px solid rgba(123, 201, 111, 0.3);
+  border-radius: 10px;
+  padding: 12px;
+}
+.active-job-name {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+.active-job-progress {
+  margin-bottom: 8px;
+}
+.progress-bar {
+  height: 8px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.progress-fill {
+  height: 100%;
+  background: #7bc96f;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+.progress-text {
+  font-size: 11px;
+  color: var(--muted);
+}
+.active-job-actions {
+  display: flex;
+  gap: 8px;
+}
+.recall-btn {
+  flex: 1;
+  border: 1px solid #e8a85d;
+  background: rgba(232, 168, 93, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #c48a2d;
+}
+.recall-btn:hover {
+  background: rgba(232, 168, 93, 0.2);
+}
+.active-job-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.active-job-rewards .claim-btn {
+  margin-left: auto;
+  border: 1px solid #7bc96f;
+  background: #7bc96f;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.outings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.job-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px;
+}
+.job-card.locked {
+  opacity: 0.5;
+}
+.job-info {
+  min-width: 0;
+}
+.job-name {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.job-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.job-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.job-rewards {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+.reward {
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.reward.gold { background: rgba(212, 160, 40, 0.15); color: #c48a2d; }
+.reward.xp { background: rgba(126, 182, 232, 0.15); color: #5a9bd4; }
+.reward.mood { background: rgba(232, 145, 176, 0.15); color: #c45a82; }
+.reward.attr { background: rgba(155, 89, 182, 0.15); color: #8e44ad; }
+.start-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.start-btn:hover:not(:disabled) {
+  background: #c45a82;
+}
+.start-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--muted);
+  border-color: var(--muted);
+}
+
+/* Daily Quests Panel */
+.daily-quests-panel {
+  padding: 8px;
+}
+.quests-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.quests-header h3 {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+.quests-progress {
+  font-size: 11px;
+  color: var(--muted);
+}
+.quests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.quest-card {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px;
+}
+.quest-card.completed {
+  border-color: rgba(123, 201, 111, 0.5);
+  background: rgba(123, 201, 111, 0.05);
+}
+.quest-card.claimed {
+  opacity: 0.5;
+}
+.quest-info {
+  min-width: 0;
+}
+.quest-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.quest-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.quest-progress-bar {
+  height: 4px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 2px;
+}
+.quest-progress-fill {
+  height: 100%;
+  background: #7bc96f;
+  border-radius: 99px;
+  transition: width 0.3s ease;
+}
+.quest-progress-text {
+  font-size: 10px;
+  color: var(--muted);
+}
+.quest-reward {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 11px;
+}
+.claim-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.claim-btn:hover:not(:disabled) {
+  background: #c45a82;
+}
+.claim-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--muted);
+  border-color: var(--muted);
+}
+.quests-complete-msg {
+  text-align: center;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .pet-art-wrap .spine-player,
 .pet-art-wrap > div[data-spine-animation] {

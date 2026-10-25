@@ -14,13 +14,15 @@ type Props = {
   usedFallback: boolean
   alt: string
   className?: string
+  mousePosition?: { x: number; y: number } | null
 }
 
 /**
  * 统一姿态渲染：frames → 序列播放；image/webp → <img>（浏览器播动画 WebP）；
  * spine → SpinePoseRenderer；失败层层回退到静图 + CSS 缓动。
+ * Live2D 路径预留（需 Cubism SDK）。
  */
-export function PoseRenderer({ pack, poseKey, def, visual, usedFallback: _usedFallback, alt, className }: Props) {
+export function PoseRenderer({ pack, poseKey, def, visual, usedFallback: _usedFallback, alt, className, mousePosition: _mousePosition }: Props) {
   const [mode, setMode] = useState<'native' | 'image-fallback'>('native')
   const type = getPoseType(def)
 

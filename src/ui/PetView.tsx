@@ -1,22 +1,40 @@
-import { useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useRef, useCallback, type PointerEvent as ReactPointerEvent } from 'react'
 import type { LoadedPack } from '../pack/schema'
 import { resolvePoseFallback, type VisualPose } from '../pack/fallbacks'
 import { STAGE_SCALE, type StageId } from '../engine/growth'
 import { PlaceholderPet } from './PlaceholderPet'
 import { PoseRenderer } from '../render/PoseRenderer'
+import type { DeskBehavior } from '../engine/desk'
 
 type Props = {
   pack: LoadedPack | null
   pose: VisualPose
   stage?: StageId
+  deskBehavior?: DeskBehavior
+  isDragging?: boolean
   onPet: () => void
+  onDragStart?: () => void
+  onDragEnd?: () => void
   onContextMenu?: () => void
+  mousePosition?: { x: number; y: number } | null
 }
 
 const DRAG_THRESHOLD = 4
 
-export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: Props) {
-  const { def, visual, usedFallback } = resolvePoseFallback(pack?.manifest ?? null, pose)
+export function PetView({ 
+  pack, 
+  pose, 
+  stage = 'adult', 
+  deskBehavior = 'idle',
+  isDragging = false,
+  onPet, 
+  onDragStart,
+  onDragEnd,
+  onContextMenu,
+  mousePosition,
+}: Props) {
+  const effectivePose = isDragging ? 'lift' : pose
+  const { def, visual, usedFallback } = resolvePoseFallback(pack?.manifest ?? null, effectivePose)
   const dragRef = useRef<{
     active: boolean
     moved: boolean
@@ -27,7 +45,14 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
   const animClass = [
     visual.bounce ? 'pet-bounce' : '',
     visual.dim ? 'pet-dim' : '',
-    pose === 'sleep' ? 'pet-sleep' : '',
+    effectivePose === 'sleep' ? 'pet-sleep' : '',
+    effectivePose === 'weak' ? 'pet-weak' : '',
+    isDragging ? 'pet-lift' : '',
+    deskBehavior === 'walk_left' ? 'pet-walk-left' : '',
+    deskBehavior === 'walk_right' ? 'pet-walk-right' : '',
+    deskBehavior === 'jump' ? 'pet-jumping' : '',
+    deskBehavior === 'edge_hide_left' ? 'pet-hide-left' : '',
+    deskBehavior === 'edge_hide_right' ? 'pet-hide-right' : '',
   ]
     .filter(Boolean)
     .join(' ')
@@ -35,7 +60,7 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
   const showPlaceholder = !pack || !def
   const scale = STAGE_SCALE[stage] ?? 1
 
-  const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
     dragRef.current = {
       active: true,
@@ -44,19 +69,22 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
       offsetY: e.clientY,
     }
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-  }
+  }, [])
 
-  const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
     if (!d?.active) return
     const dx = e.clientX - d.offsetX
     const dy = e.clientY - d.offsetY
     if (!d.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return
-    d.moved = true
+    if (!d.moved) {
+      d.moved = true
+      onDragStart?.()
+    }
     window.pet.moveWindowOffset(d.offsetX, d.offsetY)
-  }
+  }, [onDragStart])
 
-  const onPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+  const onPointerUp = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
     const d = dragRef.current
     dragRef.current = null
     try {
@@ -65,8 +93,12 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
       /* ignore */
     }
     if (!d) return
-    if (!d.moved) onPet()
-  }
+    if (d.moved) {
+      onDragEnd?.()
+    } else {
+      onPet()
+    }
+  }, [onPet, onDragEnd])
 
   return (
     <div
@@ -77,6 +109,7 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
       onPointerUp={onPointerUp}
       onPointerCancel={() => {
         dragRef.current = null
+        onDragEnd?.()
       }}
       onContextMenu={(e) => {
         e.preventDefault()
@@ -85,7 +118,12 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
     >
       <div className="pet-scale" style={{ transform: `scale(${scale})` }}>
         {showPlaceholder ? (
-          <PlaceholderPet pose={pose} dim={visual.dim} bounce={visual.bounce} />
+          <PlaceholderPet 
+            pose={effectivePose} 
+            dim={visual.dim} 
+            bounce={visual.bounce} 
+            deskBehavior={deskBehavior}
+          />
         ) : (
           <PoseRenderer
             pack={pack}
@@ -95,6 +133,7 @@ export function PetView({ pack, pose, stage = 'adult', onPet, onContextMenu }: P
             usedFallback={usedFallback}
             alt={pack.name}
             className="pet-art"
+            mousePosition={mousePosition}
           />
         )}
       </div>

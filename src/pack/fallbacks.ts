@@ -1,6 +1,19 @@
 import type { PackManifestV1, PoseDef } from './schema'
 
-export type VisualPose = 'idle' | 'pet' | 'eat' | 'sleep' | 'sad' | 'hunger' | 'play' | 'clean'
+export type VisualPose = 
+  | 'idle' 
+  | 'pet' 
+  | 'eat' 
+  | 'sleep' 
+  | 'sad' 
+  | 'hunger' 
+  | 'play' 
+  | 'clean'
+  | 'walk'
+  | 'jump'
+  | 'hide'
+  | 'lift'
+  | 'weak'
 
 export type FallbackVisual = {
   poseKey: keyof PackManifestV1['poses']
@@ -18,6 +31,11 @@ const TABLE: Record<VisualPose, FallbackVisual> = {
   hunger: { poseKey: 'hunger', bounce: true, tint: 'rgba(255,180,80,0.2)' },
   play: { poseKey: 'play', bounce: true },
   clean: { poseKey: 'pet', bounce: true },
+  walk: { poseKey: 'walk' },
+  jump: { poseKey: 'jump', bounce: true },
+  hide: { poseKey: 'hide' },
+  lift: { poseKey: 'lift' },
+  weak: { poseKey: 'weak', dim: true },
 }
 
 export function resolvePoseFallback(
